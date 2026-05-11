@@ -1,10 +1,12 @@
 "use client";
 
-import { PointerEvent, useCallback, useRef, useState } from "react";
+import { PointerEvent, useCallback, useRef, useState, WheelEvent } from "react";
 
 import dynamic from "next/dynamic";
 
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
+import { useSectionNavigator } from "@/lib/hooks/use-section-navigator";
+import { SECTIONS } from "@/lib/sections";
 
 const StageCanvas = dynamic(
   () => import("./stage-canvas").then((m) => m.StageCanvas),
@@ -24,19 +26,33 @@ export function PixelEarthStage() {
   const lastXRef = useRef(0);
   const reducedMotion = useReducedMotion();
 
-  const onPointerDown = useCallback((e: PointerEvent<HTMLDivElement>) => {
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // capture can fail on some browsers; drag still works via window events
-    }
-    isDraggingRef.current = true;
-    lastXRef.current = e.clientX;
-    lastInteractionRef.current = performance.now();
-    setGrabbing(true);
-  }, []);
+  const {
+    activeIdx,
+    targetRotationRef: screenRotationTargetRef,
+    onPointerSwipeStart,
+    onPointerSwipeMove,
+    onPointerSwipeEnd,
+    onWheel,
+    onKeyDown,
+  } = useSectionNavigator();
 
-  const onPointerMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
+  // GLOBE zone — drag-to-spin only. No section nav.
+  const onGlobePointerDown = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // capture can fail on some browsers; drag still works via window events
+      }
+      isDraggingRef.current = true;
+      lastXRef.current = e.clientX;
+      lastInteractionRef.current = performance.now();
+      setGrabbing(true);
+    },
+    [],
+  );
+
+  const onGlobePointerMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current) return;
     const dx = e.clientX - lastXRef.current;
     lastXRef.current = e.clientX;
@@ -44,7 +60,7 @@ export function PixelEarthStage() {
     lastInteractionRef.current = performance.now();
   }, []);
 
-  const onPointerUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
+  const onGlobePointerUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
@@ -55,24 +71,93 @@ export function PixelEarthStage() {
     setGrabbing(false);
   }, []);
 
+  // SCREEN zone — drives the screen carousel rotation. stopPropagation so the
+  // globe handler never sees these events.
+  const onScreenPointerDown = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // capture can fail on some browsers
+      }
+      onPointerSwipeStart(e);
+    },
+    [onPointerSwipeStart],
+  );
+
+  const onScreenPointerMove = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      onPointerSwipeMove(e);
+    },
+    [onPointerSwipeMove],
+  );
+
+  const onScreenPointerUp = useCallback(
+    (e: PointerEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // already released
+      }
+      onPointerSwipeEnd();
+    },
+    [onPointerSwipeEnd],
+  );
+
+  const onScreenWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      e.stopPropagation();
+      onWheel(e);
+    },
+    [onWheel],
+  );
+
+  const sectionTitle = SECTIONS[activeIdx]?.title ?? "About";
+
   return (
     <section
-      aria-label="Interactive pixel earth stage"
-      className={`relative h-[100svh] w-full overflow-hidden select-none touch-none ${grabbing ? "stage-cursor-grabbing" : "stage-cursor-grab"}`}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      aria-label={`Interactive pixel earth stage, ${sectionTitle} section`}
+      tabIndex={0}
+      className={`stage-shell relative h-[100svh] w-full overflow-hidden select-none touch-none outline-none ${grabbing ? "stage-cursor-grabbing" : "stage-cursor-grab"}`}
+      onPointerDown={onGlobePointerDown}
+      onPointerMove={onGlobePointerMove}
+      onPointerUp={onGlobePointerUp}
+      onPointerCancel={onGlobePointerUp}
+      onKeyDown={onKeyDown}
     >
+      <div aria-hidden className="stage-nebula pointer-events-none absolute inset-0" />
+      <div aria-hidden className="stage-vignette pointer-events-none absolute inset-0" />
       <StageCanvas
         targetRotationRef={targetRotationRef}
         isDraggingRef={isDraggingRef}
         lastInteractionRef={lastInteractionRef}
         reducedMotion={reducedMotion}
+        screenRotationTargetRef={screenRotationTargetRef}
       />
+
+      {/* SCREEN INTERACTION ZONE — invisible, captures pointer + wheel for
+          rotating the screen carousel. Covers the upper portion of the viewport
+          where the arena screen sits. */}
+      <div
+        aria-label="Section navigator: drag the circular screen to rotate between sections"
+        role="region"
+        className="absolute inset-x-0 top-0 h-[36%] cursor-ew-resize"
+        onPointerDown={onScreenPointerDown}
+        onPointerMove={onScreenPointerMove}
+        onPointerUp={onScreenPointerUp}
+        onPointerCancel={onScreenPointerUp}
+        onWheel={onScreenWheel}
+      />
+
+      <div aria-hidden className="stage-grain pointer-events-none absolute inset-0" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[color:var(--color-stage-bg)]" />
-      <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-[color:var(--color-stage-muted)]">
-        drag to spin
+      <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 text-[10px] uppercase tracking-[0.4em] text-[color:var(--color-stage-muted)]">
+        <span className="h-px w-8 bg-[color:var(--color-stage-muted)]/40" />
+        spin globe · rotate screen · ←→
+        <span className="h-px w-8 bg-[color:var(--color-stage-muted)]/40" />
       </div>
     </section>
   );

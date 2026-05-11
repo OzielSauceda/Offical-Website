@@ -1,5 +1,7 @@
 import * as THREE from "three";
 
+import { SECTIONS } from "@/lib/sections";
+
 const OCEAN = "#1b3a6f";
 const OCEAN_DARK = "#142a52";
 const OCEAN_LIGHT = "#274a85";
@@ -44,98 +46,236 @@ function paintBitmap(
   }
 }
 
-// chunky continents — not real geography, just blocky shapes that read as land
+// recognizable continent silhouettes laid out as if the 128×64 canvas were an
+// equirectangular world map (x = longitude 0-360°, y = 90°N-90°S, atlantic-centered).
+// '#' = land, '.' = darker land shading along coastal pixels.
 const CONTINENTS: { x: number; y: number; map: Bitmap }[] = [
+  // Greenland
   {
-    x: 6,
-    y: 14,
+    x: 38,
+    y: 4,
     map: [
-      " ###  ",
-      "######",
-      "######",
-      ".####.",
-      " #### ",
-      " ###  ",
+      "  ####  ",
+      " ###### ",
+      " ###### ",
+      " ######.",
+      "  ####. ",
+      "   ##.  ",
     ],
   },
+  // Iceland
   {
-    x: 22,
+    x: 48,
+    y: 12,
+    map: ["##.", ".#."],
+  },
+  // North America
+  {
+    x: 7,
+    y: 8,
+    map: [
+      "     ###   ###",
+      "    ##### #####",
+      "   ###############",
+      "  ##################",
+      "  ###################",
+      " ####################",
+      " ####################",
+      "  ##################.",
+      "   ################",
+      "    ##############",
+      "     ############",
+      "      ##########",
+      "       ########",
+      "        ######",
+      "         ####",
+      "         #####",
+      "          ####",
+      "          #####",
+      "           ####",
+      "            ###",
+      "            ##",
+    ],
+  },
+  // South America
+  {
+    x: 27,
+    y: 28,
+    map: [
+      "    #####",
+      "   #######",
+      "   #######",
+      "    ######",
+      "    ######",
+      "    #####.",
+      "    #####",
+      "    ####",
+      "    ####",
+      "    ###",
+      "    ###",
+      "    ###",
+      "     ##",
+      "     ##",
+      "     ##",
+      "     #.",
+      "     #",
+      "     .",
+    ],
+  },
+  // Europe (incl. British Isles + Scandinavia)
+  {
+    x: 49,
+    y: 13,
+    map: [
+      "         ##",
+      "    #   ###  ",
+      "   ## ## ## ##",
+      "   #############",
+      "  ##############",
+      "  ############.",
+      "   #########.",
+      "    ######",
+    ],
+  },
+  // Africa
+  {
+    x: 56,
+    y: 21,
+    map: [
+      "   ########",
+      "  ###########",
+      " #############",
+      " #############",
+      " #############",
+      "  ############",
+      "  ###########",
+      "   ##########",
+      "   #########",
+      "   ########.",
+      "    #######",
+      "    #######",
+      "    ######.",
+      "    ######",
+      "    ######",
+      "    #####.",
+      "    ####.",
+      "    ####",
+      "    ###",
+      "    ##",
+      "     #",
+    ],
+  },
+  // Madagascar
+  {
+    x: 72,
+    y: 38,
+    map: ["#", "#", "#", "#", "#"],
+  },
+  // Asia + Russia (Siberia stretching east)
+  {
+    x: 64,
+    y: 10,
+    map: [
+      "     ##################",
+      "    ####################",
+      "   #####################",
+      "  #######################",
+      " ########################",
+      " #########################",
+      "  ########################",
+      "   ########################",
+      "    ########################",
+      "    ########################",
+      "     ######################",
+      "      ###################",
+      "       ###############",
+      "        ##########",
+      "         #######",
+    ],
+  },
+  // Arabian peninsula
+  {
+    x: 70,
+    y: 24,
+    map: [
+      "######",
+      " ######",
+      "  ######",
+      "  ######",
+      "   ####",
+      "    ##",
+    ],
+  },
+  // India
+  {
+    x: 84,
     y: 22,
     map: [
-      "  ####  ",
-      " ###### ",
-      "########",
-      "########",
-      ".######.",
-      " .####  ",
-      "  ####  ",
-      "   ##   ",
+      "  ########",
+      " ##########",
+      " ##########",
+      "  ########",
+      "  ########",
+      "   ######",
+      "   ######",
+      "   #####.",
+      "   ####",
+      "    ###",
+      "    ##",
+      "     #",
     ],
   },
+  // Indochina
   {
-    x: 50,
-    y: 16,
-    map: [
-      "  ###   ",
-      " #####  ",
-      " #####  ",
-      "  ####. ",
-    ],
-  },
-  {
-    x: 60,
+    x: 95,
     y: 26,
     map: [
-      "  ######  ",
-      " ######## ",
-      "##########",
-      "##########",
-      ".########.",
-      " .######  ",
-      "   ####   ",
-      "    ##    ",
+      "######",
+      " #####",
+      " #####",
+      "  ####",
+      "   ###",
+      "    ##",
+      "    ##",
     ],
   },
-  {
-    x: 86,
-    y: 18,
-    map: [
-      "  ####  ",
-      " ###### ",
-      "########",
-      " .####. ",
-      "  ###   ",
-    ],
-  },
-  {
-    x: 100,
-    y: 30,
-    map: [
-      " ####  ",
-      "###### ",
-      "###### ",
-      " ####  ",
-    ],
-  },
+  // Japan
   {
     x: 110,
-    y: 20,
+    y: 18,
+    map: ["##", "##", " ##", "  ##", "   ##", "   #"],
+  },
+  // Indonesia + Philippines (island arc)
+  {
+    x: 93,
+    y: 33,
     map: [
-      " ## ",
-      "####",
-      "####",
-      " ## ",
+      "  ##  ## ## #",
+      " ####  ### # ",
+      "  ##.  ##",
+      "   ##",
+      "    .",
     ],
   },
+  // Australia
   {
-    x: 40,
-    y: 40,
+    x: 99,
+    y: 37,
     map: [
-      "  ###   ",
-      " #####  ",
-      " #####  ",
-      "  ###   ",
+      "  ######",
+      " ##########",
+      "############",
+      "############",
+      " ##########",
+      "  #######",
+      "    ####",
     ],
+  },
+  // New Zealand
+  {
+    x: 115,
+    y: 44,
+    map: ["##", " ##", "  #"],
   },
 ];
 
@@ -164,15 +304,14 @@ export function createEarthTexture(): THREE.CanvasTexture {
     ctx.fillRect(x, y, w, h);
   }
 
-  // polar caps with jagged edges
+  // small north-polar ice cap. southern cap is unused (only the northern
+  // hemisphere of this canvas is sampled by the upper-hemisphere dome — see
+  // the offset/repeat tx on the returned texture).
   ctx.fillStyle = ICE;
-  ctx.fillRect(0, 0, W, 4);
-  ctx.fillRect(0, H - 4, W, 4);
+  ctx.fillRect(0, 0, W, 1);
   for (let x = 0; x < W; x++) {
-    if (rand() > 0.5) ctx.fillRect(x, 4, 1, 1);
-    if (rand() > 0.5) ctx.fillRect(x, H - 5, 1, 1);
-    if (rand() > 0.75) ctx.fillRect(x, 5, 1, 1);
-    if (rand() > 0.75) ctx.fillRect(x, H - 6, 1, 1);
+    if (rand() > 0.55) ctx.fillRect(x, 1, 1, 1);
+    if (rand() > 0.8) ctx.fillRect(x, 2, 1, 1);
   }
 
   // continents
@@ -208,6 +347,12 @@ export function createEarthTexture(): THREE.CanvasTexture {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
+  // upper-hemisphere geometry still uses the full uv.y range [0,1] — without
+  // this remap the bottom of the canvas (south-pole region) renders at the
+  // equator silhouette of the dome, producing a white band. offset+repeat=0.5
+  // restricts sampling to the top half of the canvas (northern hemisphere).
+  tex.offset.set(0, 0.5);
+  tex.repeat.set(1, 0.5);
   tex.needsUpdate = true;
   return tex;
 }
@@ -323,6 +468,89 @@ function drawFrame(
   }
 }
 
+// soft radial gradient used as a "spotlight pool" painted on the globe surface
+export function createSpotlightGlow(): THREE.CanvasTexture {
+  const SIZE = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+  const cx = SIZE / 2;
+  const cy = SIZE / 2;
+  const r = SIZE / 2;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  grad.addColorStop(0.0, "rgba(255, 255, 255, 1)");
+  grad.addColorStop(0.35, "rgba(255, 255, 255, 0.55)");
+  grad.addColorStop(0.7, "rgba(255, 255, 255, 0.12)");
+  grad.addColorStop(1.0, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// abstract arena-screen surface — soft horizontal bands and pooled warm lights,
+// repeats cleanly around the cylinder so any viewing angle sees content.
+// no photo or silhouette imagery — pure procedural light.
+export function createScreenTexture(): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  // vertical gradient — deep cool blue framing, warmer in the middle
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, "#0a0b1a");
+  grad.addColorStop(0.18, "#1b2050");
+  grad.addColorStop(0.5, "#3a4a8a");
+  grad.addColorStop(0.82, "#1b2050");
+  grad.addColorStop(1, "#0a0b1a");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // pooled warm light around the circumference — six spots, evenly placed
+  const POOLS = 6;
+  for (let i = 0; i < POOLS; i++) {
+    const cx = (W / POOLS) * (i + 0.5);
+    const cy = H * 0.5;
+    const rad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 120);
+    const warm = i % 2 === 0 ? "rgba(255, 180, 140, 0.55)" : "rgba(180, 200, 255, 0.55)";
+    rad.addColorStop(0, warm);
+    rad.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = rad;
+    ctx.fillRect(cx - 140, cy - 140, 280, 280);
+  }
+
+  // horizontal scanlines — faint, every 4px
+  ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+  for (let y = 0; y < H; y += 4) {
+    ctx.fillRect(0, y, W, 1);
+  }
+
+  // top + bottom emissive trim
+  ctx.fillStyle = "rgba(220, 230, 255, 0.55)";
+  ctx.fillRect(0, 0, W, 2);
+  ctx.fillRect(0, H - 2, W, 2);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function createCharacterTexture(): THREE.CanvasTexture {
   const FRAME = 32;
   const FRAMES = 4;
@@ -353,4 +581,77 @@ export function createCharacterTexture(): THREE.CanvasTexture {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
+}
+
+// canvas-painted titles wrapped around the screen cylinder. each title is
+// drawn at the canvas U position corresponding to its angle (cylinder UV 0 =
+// +Z = camera-facing, so About at angle 0 lands at canvas x=0).
+//
+// DM Serif Display: high-contrast Didone display serif. its heavy verticals
+// hold up well at this rendering scale and against the curved-cylinder
+// foreshortening — the dramatic stroke contrast reads as cinematic-marquee.
+const LABELS_W = 4096;
+const LABELS_H = 320;
+const LABELS_FONT_PX = 132;
+const LABELS_LETTER_SPACING_PX = 30;
+
+function paintLabels(canvas: HTMLCanvasElement, fontFamily: string) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = `400 ${LABELS_FONT_PX}px ${fontFamily}, "Times New Roman", serif`;
+  ctx.fillStyle = "#f3f6ff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  // letterSpacing is a modern Canvas2D property; falls back gracefully where unsupported
+  (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing =
+    `${LABELS_LETTER_SPACING_PX}px`;
+  ctx.shadowColor = "rgba(6, 4, 18, 0.95)";
+  ctx.shadowBlur = 22;
+
+  const cy = canvas.height / 2;
+  for (const section of SECTIONS) {
+    const u = section.angle / (Math.PI * 2);
+    const x = u * canvas.width;
+    const title = section.title.toUpperCase();
+    // draw three times so labels straddling the canvas seam render fully
+    ctx.fillText(title, x, cy);
+    ctx.fillText(title, x + canvas.width, cy);
+    ctx.fillText(title, x - canvas.width, cy);
+  }
+}
+
+export function createLabelsTexture(): {
+  texture: THREE.CanvasTexture;
+  redraw: () => void;
+} {
+  const canvas = document.createElement("canvas");
+  canvas.width = LABELS_W;
+  canvas.height = LABELS_H;
+
+  const readFontFamily = () => {
+    if (typeof document === "undefined") return "Georgia";
+    const v = getComputedStyle(document.documentElement)
+      .getPropertyValue("--font-dm-serif")
+      .trim();
+    return v || "Georgia";
+  };
+
+  paintLabels(canvas, readFontFamily());
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+
+  const redraw = () => {
+    paintLabels(canvas, readFontFamily());
+    texture.needsUpdate = true;
+  };
+
+  return { texture, redraw };
 }

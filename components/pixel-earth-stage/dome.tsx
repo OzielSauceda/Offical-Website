@@ -43,27 +43,18 @@ export function Dome({
   });
 
   return (
-    <group>
-      <mesh ref={meshRef} rotation={[0, 0, 0]}>
-        <sphereGeometry args={[1, 48, 24]} />
-        <meshStandardMaterial
-          map={texture}
-          roughness={0.9}
-          metalness={0.05}
-          flatShading
-        />
-      </mesh>
-      {/* faint atmosphere halo */}
-      <mesh>
-        <sphereGeometry args={[1.06, 32, 16]} />
-        <meshBasicMaterial
-          color="#9aa9ff"
-          transparent
-          opacity={0.05}
-          side={THREE.BackSide}
-          depthWrite={false}
-        />
-      </mesh>
-    </group>
+    <mesh ref={meshRef} rotation={[0, 0, 0]}>
+      {/* upper hemisphere only — theta runs from north pole to equator */}
+      <sphereGeometry args={[1.52, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
+      <meshStandardMaterial
+        map={texture}
+        roughness={0.85}
+        metalness={0.08}
+        emissive="#1a2148"
+        emissiveIntensity={0.18}
+        flatShading
+        side={THREE.FrontSide}
+      />
+    </mesh>
   );
 }

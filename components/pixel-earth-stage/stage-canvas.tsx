@@ -11,6 +11,7 @@ type Props = {
   isDraggingRef: RefObject<boolean>;
   lastInteractionRef: RefObject<number>;
   reducedMotion: boolean;
+  screenRotationTargetRef: RefObject<number>;
 };
 
 export function StageCanvas({
@@ -18,21 +19,20 @@ export function StageCanvas({
   isDraggingRef,
   lastInteractionRef,
   reducedMotion,
+  screenRotationTargetRef,
 }: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 0.4, 3.6], fov: 42 }}
+      camera={{ position: [0, 1.75, 5.6], fov: 62 }}
       dpr={[1, 2]}
-      gl={{ antialias: false, alpha: false }}
-      onCreated={({ gl }) => {
-        gl.setClearColor("#07060d", 1);
-      }}
+      gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
     >
       <Scene
         targetRotationRef={targetRotationRef}
         isDraggingRef={isDraggingRef}
         lastInteractionRef={lastInteractionRef}
         reducedMotion={reducedMotion}
+        screenRotationTargetRef={screenRotationTargetRef}
       />
     </Canvas>
   );

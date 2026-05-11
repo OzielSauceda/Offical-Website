@@ -35,12 +35,12 @@ export function PixelCharacter({ reducedMotion }: { reducedMotion: boolean }) {
       lastSwapRef.current = now;
     }
     const tt = now / 1000;
-    const bob = reducedMotion ? 0 : Math.abs(Math.sin(tt * 5)) * 0.018;
-    sprite.position.y = 1.02 + bob;
+    const bob = reducedMotion ? 0 : Math.abs(Math.sin(tt * 5)) * 0.024;
+    sprite.position.y = 1.57 + bob;
   });
 
   return (
-    <sprite ref={spriteRef} position={[0, 1.02, 0]} scale={[0.28, 0.28, 0.28]}>
+    <sprite ref={spriteRef} position={[0, 1.57, 0]} scale={[0.42, 0.42, 0.42]}>
       <spriteMaterial
         map={tex}
         transparent

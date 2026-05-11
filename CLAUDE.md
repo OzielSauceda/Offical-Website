@@ -60,9 +60,12 @@ content/blog/       MDX posts
 lib/                pure utilities, Zod schemas, clients (resend, ratelimit)
 lib/mdx/            Velite config + MDX component overrides
 public/             static assets — images served via next/image
+plans/              implementation plans — one md per planned feature, written before code
 ```
 
 **Invariant:** nothing in `lib/` imports from `app/` or `components/`. `lib/` is the leaf of the dependency graph.
+
+**`plans/`:** non-trivial features get a self-contained markdown spec here before code is written. A plan covers context, approach, files touched, and verification — enough that any session can pick it up and ship it. When a plan is executed, log it in `PROJECT_CHANGES.md` §7 and leave the plan file in place as history.
 
 ---
 
