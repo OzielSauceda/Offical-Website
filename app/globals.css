@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+:root {
+  --color-stage-bg: #07060d;
+  --color-stage-bg-2: #0d0a1a;
+  --color-stage-glow: #9aa9ff;
+  --color-stage-rim: #ff8aa0;
+  --color-stage-earth-ocean: #1b3a6f;
+  --color-stage-earth-land: #2f7a3d;
+  --color-stage-earth-shadow: #0d1a3a;
+  --color-stage-fg: #e6e4f2;
+  --color-stage-muted: #8a87a3;
+}
+
+@theme inline {
+  --color-bg: var(--color-stage-bg);
+  --color-bg-2: var(--color-stage-bg-2);
+  --color-glow: var(--color-stage-glow);
+  --color-rim: var(--color-stage-rim);
+  --color-fg: var(--color-stage-fg);
+  --color-muted: var(--color-stage-muted);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background: var(--color-stage-bg);
+  color: var(--color-stage-fg);
+}
+
+body {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+.stage-cursor-grab {
+  cursor: grab;
+}
+.stage-cursor-grabbing {
+  cursor: grabbing;
+}
