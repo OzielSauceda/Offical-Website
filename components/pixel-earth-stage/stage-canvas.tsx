@@ -21,7 +21,7 @@ export function StageCanvas({
 }: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 0.85, 3.2], fov: 30 }}
+      camera={{ position: [0, 0.4, 3.6], fov: 42 }}
       dpr={[1, 2]}
       gl={{ antialias: false, alpha: false }}
       onCreated={({ gl }) => {

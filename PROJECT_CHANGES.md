@@ -96,12 +96,12 @@ RSC by default. `"use client"` only at leaves needing state/effects/events (form
 
 ### Home page hero (`PixelEarthStage`)
 Lives in `components/pixel-earth-stage/`. Wired into `app/(site)/page.tsx`.
-- `pixel-earth-stage.tsx` — client wrapper. Owns drag state (refs) and pointer-event listeners on the outer `<section>`. Loads the heavy R3F canvas via `next/dynamic({ ssr: false })`.
-- `stage-canvas.tsx` — the R3F `<Canvas>` host.
-- `scene.tsx` — composes the scene: lights, fog, floor, dome, ring, beams, character, star field.
-- `dome.tsx` — the rotating earth sphere. Reads target rotation ref each frame, eases toward it. Auto-rotates after `RESUME_DELAY_MS` of no interaction.
+- `pixel-earth-stage.tsx` — client wrapper. Section is `h-[100svh]` (explicit, not `min-h-*`, so the R3F canvas's `height: 100%` resolves cleanly). Owns drag state (refs) and pointer-event listeners. Loads the heavy R3F canvas via `next/dynamic({ ssr: false })`.
+- `stage-canvas.tsx` — R3F `<Canvas>` host. Camera `[0, 0.4, 3.6]` fov `42` — wide enough that the whole 2-unit dome fits inside the vertical viewport at all desktop aspect ratios, so the dome's textured surface never collides with a viewport edge.
+- `scene.tsx` — composes the scene: lights, fog (`2.6 → 6.5`), dome, glow ring, stage beams, character, stars. Stage group sits at `STAGE_Y = 0` so the dome center lands at the camera's look-at point = visual center of the viewport. No floor disc — the lower hemisphere of the dome floats in dark space instead.
+- `dome.tsx` — rotating earth sphere. Reads target rotation ref each frame, eases toward it. Auto-rotates after `RESUME_DELAY_MS` of no interaction.
 - `pixel-character.tsx` — billboarded `<Sprite>` at the north pole. 4-frame spritesheet, swaps frame every `FRAME_MS`. Bobs vertically when motion isn't reduced.
-- `glow-ring.tsx`, `stage-beams.tsx` — additive-blended geometry for the bright base ring and the diagonal stage lights.
+- `glow-ring.tsx`, `stage-beams.tsx` — additive-blended geometry for the bright equator ring and the diagonal stage lights.
 - `textures.ts` — procedural earth (128×64) and character (128×32) textures, both with `NearestFilter` for the pixel look.
 - `lib/hooks/use-reduced-motion.ts` — `useSyncExternalStore` over `matchMedia('(prefers-reduced-motion: reduce)')`. Every animated piece reads it and bails when reduced.
 
@@ -111,6 +111,8 @@ Lives in `components/pixel-earth-stage/`. Wired into `app/(site)/page.tsx`.
 
 Non-obvious choices and the reason. New decisions go at the top.
 
+- **2026-05-10 — Hero shows the full floating globe, not a half-dome.** Original brief described a "half-globe emerging from a stage." After iterating in the browser, the version that reads cleanest is a full sphere centered in the viewport with the glowing equator ring as the visual anchor. Switched from `STAGE_Y = -0.55` + dark floor disc to `STAGE_Y = 0` + no floor + wider camera (`fov 42`, `z 3.6`) so the whole sphere fits and nothing clips. Reason: clipped textured surfaces at the viewport edge read as a "hard horizontal cutoff" no matter how subtle the gradient mask is — easier to just fit the geometry.
+- **2026-05-10 — Section uses `h-[100svh]`, not `min-h-[100svh]`.** R3F's `<Canvas>` sets its inner wrapper to `height: 100%`, which only resolves against a parent's explicit `height`, not `min-height`. With `min-h-*` only, the canvas can collapse to a small height on some browsers and the dome ends up in a sliver at the top of the section. Reason: avoid this entire class of "why is the canvas tiny" bug.
 - **2026-05-10 — Next 16 instead of Next 15.** `create-next-app@latest` shipped Next 16.2.6; sticking with the latest. Updated stack table and CLAUDE.md mentions of "Next 15" to "Next 16."
 - **2026-05-10 — Three.js + React Three Fiber for the home hero.** Procedural 128×64 pixel earth texture with `NearestFilter`, sphere geometry at 48×24 segments, billboard character on the north pole. Reason: pure canvas/CSS can't fake the dome depth and lighting of the reference. Heavy bundle is mitigated by `next/dynamic({ ssr: false })`.
 - **2026-05-10 — `useSyncExternalStore` for `useReducedMotion`.** React 19's stricter lint rules forbid `setState` inside `useEffect` for media-query subscriptions. `useSyncExternalStore` is the React-19-idiomatic replacement.
@@ -129,7 +131,8 @@ Non-obvious choices and the reason. New decisions go at the top.
 Reverse-chronological. Each entry: date, one-line summary, scope (files/routes touched), why. Squash trivial edits — log the meaningful ones.
 
 ### 2026-05-10
-- **Bootstrapped Next.js 16 + R3F hero.** Scaffolded with `create-next-app@latest` (Next 16.2.6, React 19.2.4, Tailwind v4). Added `three`, `@react-three/fiber`, `@react-three/drei`, `motion`, `eslint-plugin-simple-import-sort`. Built `PixelEarthStage` — pixel-art half-globe with procedural texture, drag-to-spin, auto-rotation, glow ring, additive-blend stage beams, dancing pixel character sprite. Wired into `app/(site)/page.tsx`. Why: site needed a hero that immediately reads as "this is mine" — a dome-stage concert vibe that's interactive and unique.
+- **Refined hero framing.** Iterated in the browser: removed the dark `FloorPlane` disc (it was occluding the dome's lower hemisphere and creating a hard horizontal seam), centered the dome at the origin (`STAGE_Y = 0`), and widened the camera to `[0, 0.4, 3.6]` fov `42` so the whole sphere fits in the viewport with no edge clipping. Section switched from `min-h-[100svh]` to `h-[100svh]` so the canvas reliably fills it. Fog softened to `2.6 / 6.5`.
+- **Bootstrapped Next.js 16 + R3F hero.** Scaffolded with `create-next-app@latest` (Next 16.2.6, React 19.2.4, Tailwind v4). Added `three`, `@react-three/fiber`, `@react-three/drei`, `motion`, `eslint-plugin-simple-import-sort`. Built `PixelEarthStage` — pixel-art globe with procedural texture, drag-to-spin, auto-rotation, glow ring, additive-blend stage beams, dancing pixel character sprite. Wired into `app/(site)/page.tsx`. Why: site needed a hero that immediately reads as "this is mine" — a concert-stage globe that's interactive and unique.
 - **Initial scaffolding plan written.** Added `CLAUDE.md` (operating rules) and `PROJECT_CHANGES.md` (this file). Why: lock conventions before writing the first line of TypeScript so the site doesn't drift into AI-mush.
 
 ---

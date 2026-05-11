@@ -58,7 +58,7 @@ export function PixelEarthStage() {
   return (
     <section
       aria-label="Interactive pixel earth stage"
-      className={`relative min-h-[100svh] w-full overflow-hidden select-none touch-none ${grabbing ? "stage-cursor-grabbing" : "stage-cursor-grab"}`}
+      className={`relative h-[100svh] w-full overflow-hidden select-none touch-none ${grabbing ? "stage-cursor-grabbing" : "stage-cursor-grab"}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
