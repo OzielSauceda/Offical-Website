@@ -357,6 +357,179 @@ export function createEarthTexture(): THREE.CanvasTexture {
   return tex;
 }
 
+// pale cream / gray tarp surface for the projects pyramid stage. vertical
+// streaks (weathering / water marks) + faint horizontal panel seams + pixel
+// dirt grain. low-saturation throughout so the stage reads as constructed
+// rather than natural. wraps horizontally so the four faces share the
+// canvas seamlessly.
+export function createTarpTexture(): THREE.CanvasTexture {
+  const W = 256;
+  const H = 512;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  // base — pale cream with a hint of warm gray, slightly darker toward the bottom
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0.0, "#dccfb4");
+  grad.addColorStop(0.55, "#c8bba0");
+  grad.addColorStop(1.0, "#9a8e75");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  const rand = rng(0x7a72);
+
+  // vertical weathering streaks — long darker columns that vary in width and opacity
+  for (let i = 0; i < 38; i++) {
+    const x = Math.floor(rand() * W);
+    const w = 1 + Math.floor(rand() * 3);
+    const alpha = 0.04 + rand() * 0.20;
+    // streaks usually start near the top and run down
+    const startY = Math.floor(rand() * H * 0.20);
+    const endY = startY + Math.floor(H * (0.55 + rand() * 0.45));
+    ctx.fillStyle = `rgba(48, 40, 28, ${alpha})`;
+    ctx.fillRect(x, startY, w, Math.min(endY - startY, H - startY));
+    // occasional brighter highlight streak right next to it
+    if (rand() > 0.6) {
+      ctx.fillStyle = `rgba(248, 240, 222, ${0.05 + rand() * 0.07})`;
+      ctx.fillRect(x + w, startY, 1, Math.min(endY - startY, H - startY));
+    }
+  }
+
+  // horizontal panel seams — thin darker lines at regular-ish intervals so
+  // the surface reads as a sequence of tarp panels stitched together
+  const SEAM_EVERY = 64;
+  for (let y = SEAM_EVERY; y < H; y += SEAM_EVERY) {
+    const jitter = Math.floor((rand() - 0.5) * 4);
+    const py = y + jitter;
+    ctx.fillStyle = "rgba(40, 32, 22, 0.35)";
+    ctx.fillRect(0, py, W, 1);
+    ctx.fillStyle = "rgba(240, 230, 210, 0.10)";
+    ctx.fillRect(0, py - 1, W, 1);
+    // a few rivet-like punctuation dots along the seam
+    for (let x = 8; x < W; x += 22) {
+      const jx = Math.floor((rand() - 0.5) * 4);
+      ctx.fillStyle = "rgba(30, 24, 16, 0.55)";
+      ctx.fillRect(x + jx, py - 1, 2, 2);
+    }
+  }
+
+  // pixel dirt grain — tiny darker/brighter pixels for pixel-art noise
+  for (let i = 0; i < W * H * 0.05; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
+    const dark = rand() > 0.5;
+    ctx.fillStyle = dark
+      ? `rgba(40, 32, 22, ${0.05 + rand() * 0.18})`
+      : `rgba(245, 235, 215, ${0.04 + rand() * 0.10})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  // wider darker smudge bands near the bottom (weathered / stage-floor grime)
+  for (let i = 0; i < 8; i++) {
+    const cy = Math.floor(H * (0.65 + rand() * 0.30));
+    const cw = 30 + Math.floor(rand() * 80);
+    const cx = Math.floor(rand() * W);
+    ctx.fillStyle = `rgba(30, 24, 16, ${0.06 + rand() * 0.10})`;
+    ctx.fillRect(cx, cy, cw, 2 + Math.floor(rand() * 3));
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// dark stage flooring — pale-board panels with seams. used for the apron
+// disc around the pyramid base.
+export function createStageFloorTexture(): THREE.CanvasTexture {
+  const W = 256;
+  const H = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  ctx.fillStyle = "#3a342c";
+  ctx.fillRect(0, 0, W, H);
+
+  const rand = rng(0xf100);
+
+  // radial-ish panel pattern — concentric darker rings to imply boards
+  for (let i = 0; i < 6; i++) {
+    const cy = Math.floor((i + 1) * (H / 7));
+    ctx.fillStyle = "rgba(24, 20, 16, 0.55)";
+    ctx.fillRect(0, cy, W, 1);
+  }
+  // light panel highlights
+  for (let i = 0; i < 6; i++) {
+    const cy = Math.floor((i + 1) * (H / 7)) - 1;
+    ctx.fillStyle = "rgba(110, 100, 86, 0.18)";
+    ctx.fillRect(0, cy, W, 1);
+  }
+
+  // pixel grain
+  for (let i = 0; i < W * H * 0.04; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
+    ctx.fillStyle =
+      rand() > 0.5
+        ? `rgba(18, 14, 10, ${0.06 + rand() * 0.16})`
+        : `rgba(90, 80, 66, ${0.05 + rand() * 0.10})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// soft additive smoke — pale lobed shapes used to wash the stage base in fog
+export function createSmokeTexture(): THREE.CanvasTexture {
+  const SIZE = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  const rand = rng(0x5705);
+  for (let i = 0; i < 30; i++) {
+    const cx = rand() * SIZE;
+    const cy = SIZE * 0.4 + rand() * SIZE * 0.5;
+    const r = 30 + rand() * 90;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const a = 0.05 + rand() * 0.12;
+    grad.addColorStop(0, `rgba(245, 240, 230, ${a})`);
+    grad.addColorStop(0.6, `rgba(200, 195, 185, ${a * 0.4})`);
+    grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 // character: 4 frames of 32x32, drawn into a 128x32 sheet
 const HELMET = "#ffd84a";
 const HELMET_DARK = "#c79c1f";

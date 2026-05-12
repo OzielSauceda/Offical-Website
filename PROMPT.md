@@ -1,64 +1,52 @@
-Please use the frontend design skill for this task.
+Stop the material/styling phase. The current geometry is still too different from the reference.
 
-Make this change directly in Default mode. Inspect the current Three.js scene and interaction code first, then implement this carefully without redesigning the scene.
+The issue is not the colors or textures. The silhouette is wrong.
 
-Important clarification:
-I do NOT want the circular screen title to simply fade/swap while the screen stays still.
+The current model still looks like stacked clean shapes:
+- large pyramid base
+- flat slab
+- trapezoid block
+- vertical wedge tower
 
-I want the circular screen to behave more like the globe: the user should be able to swipe/drag the circular screen horizontally and rotate it around its vertical axis. The section titles should be physically positioned around the circular screen at fixed angles, so as the screen rotates, different titles come into the front-facing view.
+The reference should look like a carved Yeezus-style mountain:
+- one large diagonal lower mass
+- embedded horizontal ledge
+- upper platform carved into the mountain
+- long triangular peak/ridge, not a vertical tower
 
-Think of the circular screen like a rotating 360-degree display/carousel.
+Do not add textures.
+Do not add platform.
+Do not add sign.
+Do not add lighting.
+Only fix geometry.
 
-Section titles:
-- About
-- Projects
-- Research
-- Contact
+Main fixes:
 
-Desired behavior:
-- Place each section title at a fixed angular position around the circular screen.
-- Example: About at 0 degrees, Projects at 90 degrees, Research at 180 degrees, Contact at 270 degrees.
-- When the user drags/swipes the circular screen, the screen/title group should rotate smoothly.
-- The active section is whichever title is facing the camera/front.
-- When the user releases, the screen should smoothly snap to the nearest section angle.
-- The title should feel attached to the screen surface, not like flat UI text floating independently.
-- The movement should feel smooth and physical, similar to the globe drag/swipe feeling.
+1. LowerBaseWedge:
+Make it less like a perfect pyramid. It needs a chunkier front wall and stronger diagonal side/ramp planes. The top should not feel like a giant clean flat pyramid top.
 
-Very important:
-- Do not implement this as a simple text state change in the center.
-- Do not just crossfade one title into another.
-- The titles should move because the circular screen is rotating.
-- The title positions should be hard-positioned around the screen at different degrees.
-- The circular screen should visually react to the swipe, not just the text.
+2. MiddleHorizontalLedge:
+Keep it thin, but make it feel embedded into the mountain, not like a separate plank floating between layers.
 
-Interaction separation:
-- Dragging/swiping the globe should only rotate the globe.
-- Dragging/swiping the circular screen should only rotate the circular screen and change the active section.
-- Globe interaction should not change the section.
-- Screen interaction should not rotate the globe.
+3. UpperBlockTier:
+Make it feel like a carved upper platform that supports the peak, not a separate trapezoid sitting on the ledge.
 
-Visual constraints:
-- Keep the current scene composition, globe, spotlight, screen size/position, hanging wires, base ring, lighthouse, stars, compass, colors, and camera framing intact.
-- Keep the section title style polished and centered when it reaches the front.
-- Use a refined modern display font treatment that fits the cinematic circular screen.
-- Keep the text readable and visually integrated with the curved screen.
+4. TopTriangularPeak:
+This is the biggest fix. The peak must become a long triangular mountain fin/ridge.
+It should not look like a vertical tower.
+It should not look like a rectangular wedge standing upright.
+It should have a long diagonal sloped face visible from the side.
+From the top view, it should have a longer narrow footprint, not a short blocky footprint.
 
-Implementation guidance:
-- Ideally create a screen/title group that rotates around the Y axis.
-- Attach title meshes/sprites/canvas textures to positions around the circular screen circumference.
-- Use smooth drag tracking while the pointer is down.
-- Use easing/inertia/snap animation on release.
-- Keep section data in a clean config array with title and angle.
-- Avoid adding dependencies unless truly necessary.
+Reference angle goals:
+- Front-right view: broad base, thin ledge, upper tier, long diagonal peak face.
+- Right view: strong long slope rising into the peak, not stacked blocks.
+- Back-right view: peak should dominate as a large triangular wall/fin.
+- Top view: offset diagonal footprint, not clean centered rectangles.
 
-After editing, run the app locally and verify:
-- dragging the circular screen rotates the screen/title carousel smoothly,
-- titles are positioned around the screen at fixed angles,
-- releasing the drag snaps to About, Projects, Research, or Contact,
-- the front-facing title is centered on the circular screen,
-- dragging the globe still only rotates the globe,
-- dragging the globe does not change the circular screen section,
-- mobile touch and desktop mouse interactions both work,
-- no unrelated visual changes were introduced.
-
-Please summarize exactly which files changed, what changed in each file, and how you verified it.
+Acceptance criteria:
+1. The side view shows a long diagonal mountain slope.
+2. The peak looks like a long triangular fin, not a vertical tower.
+3. The ledge feels carved into the mountain.
+4. The structure feels like one carved stone form, not stacked toy blocks.
+5. Show front, right, back-right, and top views after the change.

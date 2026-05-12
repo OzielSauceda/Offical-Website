@@ -3,7 +3,7 @@
 // shader uniforms are three objects designed to be mutated each frame
 /* eslint-disable react-hooks/immutability */
 
-import { useMemo, useRef } from "react";
+import { RefObject, useMemo, useRef } from "react";
 
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -44,29 +44,52 @@ const FRAG = /* glsl */ `
 
 type Props = {
   reducedMotion: boolean;
+  envBlendRef: RefObject<number>;
 };
 
-export function Atmosphere({ reducedMotion }: Props) {
+const INNER_BASE_INTENSITY = 1.35;
+const OUTER_BASE_INTENSITY = 0.55;
+
+export function Atmosphere({ reducedMotion, envBlendRef }: Props) {
   const matRef = useRef<THREE.ShaderMaterial>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
   const uniforms = useMemo(
     () => ({
       uInner: { value: new THREE.Color("#7d8fff") },
       uOuter: { value: new THREE.Color("#c9b4ff") },
       uPower: { value: 2.6 },
-      uIntensity: { value: 1.35 },
+      uIntensity: { value: INNER_BASE_INTENSITY },
       uTime: { value: 0 },
     }),
     [],
   );
 
+  const outerUniforms = useMemo(
+    () => ({
+      uInner: { value: new THREE.Color("#5b6fff") },
+      uOuter: { value: new THREE.Color("#ff9cb0") },
+      uPower: { value: 4.0 },
+      uIntensity: { value: OUTER_BASE_INTENSITY },
+      uTime: uniforms.uTime,
+    }),
+    [uniforms.uTime],
+  );
+
   useFrame((_, delta) => {
-    if (reducedMotion || !matRef.current) return;
-    uniforms.uTime.value += delta;
+    if (!reducedMotion) uniforms.uTime.value += delta;
+    // halo only makes sense while the globe is on stage — fade with it
+    const k = 1 - envBlendRef.current;
+    uniforms.uIntensity.value = INNER_BASE_INTENSITY * k;
+    outerUniforms.uIntensity.value = OUTER_BASE_INTENSITY * k;
+    // belt + suspenders: also skip drawing the hemispheres entirely once
+    // they're effectively invisible, so no transparent dome geometry can
+    // contribute curvature over the mountain scene
+    if (groupRef.current) groupRef.current.visible = k > 0.002;
   });
 
   return (
-    <group>
+    <group ref={groupRef}>
       {/* inner soft halo, hugs the upper hemisphere */}
       <mesh>
         <sphereGeometry args={[1.63, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
@@ -85,13 +108,7 @@ export function Atmosphere({ reducedMotion }: Props) {
       <mesh>
         <sphereGeometry args={[1.85, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <shaderMaterial
-          uniforms={{
-            uInner: { value: new THREE.Color("#5b6fff") },
-            uOuter: { value: new THREE.Color("#ff9cb0") },
-            uPower: { value: 4.0 },
-            uIntensity: { value: 0.55 },
-            uTime: uniforms.uTime,
-          }}
+          uniforms={outerUniforms}
           vertexShader={VERT}
           fragmentShader={FRAG}
           side={THREE.BackSide}

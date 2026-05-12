@@ -4,6 +4,8 @@ import { RefObject } from "react";
 
 import { Canvas } from "@react-three/fiber";
 
+import type { EnvironmentId } from "@/lib/sections";
+
 import { Scene } from "./scene";
 
 type Props = {
@@ -12,6 +14,7 @@ type Props = {
   lastInteractionRef: RefObject<number>;
   reducedMotion: boolean;
   screenRotationTargetRef: RefObject<number>;
+  environment: EnvironmentId;
 };
 
 export function StageCanvas({
@@ -20,6 +23,7 @@ export function StageCanvas({
   lastInteractionRef,
   reducedMotion,
   screenRotationTargetRef,
+  environment,
 }: Props) {
   return (
     <Canvas
@@ -33,6 +37,7 @@ export function StageCanvas({
         lastInteractionRef={lastInteractionRef}
         reducedMotion={reducedMotion}
         screenRotationTargetRef={screenRotationTargetRef}
+        environment={environment}
       />
     </Canvas>
   );

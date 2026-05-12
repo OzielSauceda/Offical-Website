@@ -3,7 +3,7 @@
 // three textures need direct mutation each frame to flip the spritesheet
 /* eslint-disable react-hooks/immutability */
 
-import { useRef, useState } from "react";
+import { RefObject, useRef, useState } from "react";
 
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -13,7 +13,12 @@ import { createCharacterTexture } from "./textures";
 const FRAMES = 4;
 const FRAME_MS = 180;
 
-export function PixelCharacter({ reducedMotion }: { reducedMotion: boolean }) {
+type Props = {
+  reducedMotion: boolean;
+  envBlendRef: RefObject<number>;
+};
+
+export function PixelCharacter({ reducedMotion, envBlendRef }: Props) {
   const [tex] = useState(() => {
     const t = createCharacterTexture();
     t.repeat.set(1 / FRAMES, 1);
@@ -22,6 +27,7 @@ export function PixelCharacter({ reducedMotion }: { reducedMotion: boolean }) {
   });
 
   const spriteRef = useRef<THREE.Sprite>(null);
+  const matRef = useRef<THREE.SpriteMaterial>(null);
   const lastSwapRef = useRef(0);
   const frameRef = useRef(0);
 
@@ -37,11 +43,19 @@ export function PixelCharacter({ reducedMotion }: { reducedMotion: boolean }) {
     const tt = now / 1000;
     const bob = reducedMotion ? 0 : Math.abs(Math.sin(tt * 5)) * 0.024;
     sprite.position.y = 1.57 + bob;
+
+    // hide the lighthouse during non-globe environments
+    if (matRef.current) {
+      const op = 1 - envBlendRef.current;
+      matRef.current.opacity = op;
+      sprite.visible = op > 0.002;
+    }
   });
 
   return (
     <sprite ref={spriteRef} position={[0, 1.57, 0]} scale={[0.42, 0.42, 0.42]}>
       <spriteMaterial
+        ref={matRef}
         map={tex}
         transparent
         depthTest={true}

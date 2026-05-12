@@ -71,6 +71,14 @@ export function PixelEarthStage() {
     setGrabbing(false);
   }, []);
 
+  const onEnvironmentWheel = useCallback((e: WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const primaryDelta =
+      Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    targetRotationRef.current += primaryDelta * 0.0022;
+    lastInteractionRef.current = performance.now();
+  }, []);
+
   // SCREEN zone — drives the screen carousel rotation. stopPropagation so the
   // globe handler never sees these events.
   const onScreenPointerDown = useCallback(
@@ -109,6 +117,7 @@ export function PixelEarthStage() {
 
   const onScreenWheel = useCallback(
     (e: WheelEvent<HTMLDivElement>) => {
+      e.preventDefault();
       e.stopPropagation();
       onWheel(e);
     },
@@ -116,6 +125,7 @@ export function PixelEarthStage() {
   );
 
   const sectionTitle = SECTIONS[activeIdx]?.title ?? "About";
+  const environment = SECTIONS[activeIdx]?.environment ?? "globe";
 
   return (
     <section
@@ -126,6 +136,7 @@ export function PixelEarthStage() {
       onPointerMove={onGlobePointerMove}
       onPointerUp={onGlobePointerUp}
       onPointerCancel={onGlobePointerUp}
+      onWheel={onEnvironmentWheel}
       onKeyDown={onKeyDown}
     >
       <div aria-hidden className="stage-nebula pointer-events-none absolute inset-0" />
@@ -136,6 +147,7 @@ export function PixelEarthStage() {
         lastInteractionRef={lastInteractionRef}
         reducedMotion={reducedMotion}
         screenRotationTargetRef={screenRotationTargetRef}
+        environment={environment}
       />
 
       {/* SCREEN INTERACTION ZONE — invisible, captures pointer + wheel for
@@ -156,7 +168,7 @@ export function PixelEarthStage() {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[color:var(--color-stage-bg)]" />
       <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 text-[10px] uppercase tracking-[0.4em] text-[color:var(--color-stage-muted)]">
         <span className="h-px w-8 bg-[color:var(--color-stage-muted)]/40" />
-        spin globe · rotate screen · ←→
+        spin environment · rotate screen · ←→
         <span className="h-px w-8 bg-[color:var(--color-stage-muted)]/40" />
       </div>
     </section>

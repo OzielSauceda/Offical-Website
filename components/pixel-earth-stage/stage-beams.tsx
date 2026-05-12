@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { RefObject, useEffect, useMemo, useRef } from "react";
 
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -107,7 +107,9 @@ const HALO_OFFSET = 1.002;
 const SCREEN_UNDERSIDE_Y = 2.425;
 const ZAXIS = new THREE.Vector3(0, 0, 1);
 
-export function StageBeams({ reducedMotion }: { reducedMotion: boolean }) {
+type Props = { reducedMotion: boolean; envBlendRef: RefObject<number> };
+
+export function StageBeams({ reducedMotion, envBlendRef }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const coreRefs = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
   const haloRefs = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
@@ -144,6 +146,10 @@ export function StageBeams({ reducedMotion }: { reducedMotion: boolean }) {
       grp.rotation.y += delta * 0.06;
     }
     const t = performance.now() / 1000;
+    // pools sit on the globe surface — fade them with the globe. rays project
+    // from the screen so they still add atmosphere over the mountains; keep
+    // those, only dialed back slightly while the globe is gone.
+    const globePresence = 1 - envBlendRef.current;
     for (let i = 0; i < PATCHES.length; i++) {
       const core = coreRefs.current[i];
       const halo = haloRefs.current[i];
@@ -154,9 +160,11 @@ export function StageBeams({ reducedMotion }: { reducedMotion: boolean }) {
         ? 0
         : Math.sin(t * cfg.pulseSpeed + cfg.phase);
       const target = cfg.baseOpacity + cfg.pulseAmp * wave;
-      if (core) core.opacity = Math.min(1, target);
-      if (halo) halo.opacity = Math.min(1, target * 0.45);
-      if (ray) ray.opacity = Math.max(0, cfg.rayOpacity + 0.015 * wave);
+      if (core) core.opacity = Math.min(1, target) * globePresence;
+      if (halo) halo.opacity = Math.min(1, target * 0.45) * globePresence;
+      // rays converge from the screen down to the dome surface — without the
+      // dome to land on they read as an overhead canopy, so kill them too
+      if (ray) ray.opacity = Math.max(0, cfg.rayOpacity + 0.015 * wave) * globePresence;
     }
   });
 

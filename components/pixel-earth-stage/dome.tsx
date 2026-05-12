@@ -15,6 +15,7 @@ type Props = {
   isDraggingRef: RefObject<boolean>;
   lastInteractionRef: RefObject<number>;
   reducedMotion: boolean;
+  envBlendRef: RefObject<number>;
 };
 
 export function Dome({
@@ -22,8 +23,10 @@ export function Dome({
   isDraggingRef,
   lastInteractionRef,
   reducedMotion,
+  envBlendRef,
 }: Props) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
   const texture = useMemo(() => createEarthTexture(), []);
 
   useFrame((_, delta) => {
@@ -31,8 +34,15 @@ export function Dome({
     if (!mesh) return;
     const now = performance.now();
     const sinceInteraction = now - lastInteractionRef.current;
+    // only auto-rotate while the globe is the active environment. when in
+    // pyramid (or any non-globe) env, leave targetRotationRef alone so the
+    // pyramid stage sits still until the user drags it.
+    const inGlobeMode = envBlendRef.current < 0.5;
     const canAutoRotate =
-      !reducedMotion && !isDraggingRef.current && sinceInteraction > RESUME_DELAY_MS;
+      !reducedMotion &&
+      !isDraggingRef.current &&
+      sinceInteraction > RESUME_DELAY_MS &&
+      inGlobeMode;
     if (canAutoRotate) {
       targetRotationRef.current += AUTO_SPEED * delta;
     }
@@ -40,6 +50,13 @@ export function Dome({
     const target = targetRotationRef.current;
     // ease toward target so drag feels responsive but not jittery
     mesh.rotation.y = current + (target - current) * Math.min(1, delta * 14);
+
+    const mat = matRef.current;
+    if (mat) {
+      const op = 1 - envBlendRef.current;
+      mat.opacity = op;
+      mesh.visible = op > 0.04;
+    }
   });
 
   return (
@@ -47,6 +64,7 @@ export function Dome({
       {/* upper hemisphere only — theta runs from north pole to equator */}
       <sphereGeometry args={[1.52, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2]} />
       <meshStandardMaterial
+        ref={matRef}
         map={texture}
         roughness={0.85}
         metalness={0.08}
@@ -54,6 +72,7 @@ export function Dome({
         emissiveIntensity={0.18}
         flatShading
         side={THREE.FrontSide}
+        transparent
       />
     </mesh>
   );
