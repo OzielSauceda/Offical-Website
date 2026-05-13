@@ -8,43 +8,105 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-import { createScreenTexture } from "./textures";
+import { createScreenTexture, createTitleFlashTexture } from "./textures";
 
-const RADIUS = 1.78;
-const HEIGHT = 0.85;
-const Y = 2.85;
+const RADIUS = 1.96;
+const HEIGHT = 0.82;
+const Y = 2.87;
 const SEGMENTS = 96;
 const CABLE_COUNT = 6;
-const CABLE_LENGTH = 1.0;
+const CABLE_LENGTH = 1.18;
 const CABLE_RADIUS = 0.009;
 
 type Props = {
   reducedMotion: boolean;
+  entered: boolean;
+  enteredHeader: string;
+  enteredSubhead: string;
 };
 
-export function ArenaScreen({ reducedMotion }: Props) {
-  const texture = useMemo(() => createScreenTexture(), []);
+export function ArenaScreen({
+  reducedMotion,
+  entered,
+  enteredHeader,
+  enteredSubhead,
+}: Props) {
+  const baseTexture = useMemo(() => createScreenTexture(), []);
+  // one cached flash texture per header+sub pair. cleared on unmount.
+  const flashCacheRef = useRef<Map<string, THREE.CanvasTexture>>(new Map());
   const screenMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const topRimRef = useRef<THREE.MeshBasicMaterial>(null);
   const botRimRef = useRef<THREE.MeshBasicMaterial>(null);
+  // tracks the transition. ramps to 1 when entered, back to 0 when not.
+  const flashRef = useRef(0);
+  const lastAppliedKeyRef = useRef<"base" | string>("base");
 
   useEffect(() => {
-    return () => texture.dispose();
-  }, [texture]);
+    const cache = flashCacheRef.current;
+    return () => {
+      baseTexture.dispose();
+      cache.forEach((t) => t.dispose());
+      cache.clear();
+    };
+  }, [baseTexture]);
+
+  const getFlashTexture = (header: string, sub: string) => {
+    const cache = flashCacheRef.current;
+    const key = `${header}${sub}`;
+    let t = cache.get(key);
+    if (!t) {
+      t = createTitleFlashTexture(header, sub);
+      cache.set(key, t);
+    }
+    return t;
+  };
 
   useFrame((_, delta) => {
-    if (reducedMotion) return;
-    // slow scroll so the pooled lights drift around the cylinder
-    texture.offset.x = (texture.offset.x + delta * 0.03) % 1;
+    const mat = screenMatRef.current;
+    if (!mat) return;
+
+    // ramp the flash transition. 0 = base scrolling screen, 1 = locked title.
+    // the swap happens at the midpoint so the screen briefly dims through black.
+    const targetFlash = entered ? 1 : 0;
+    const rate = reducedMotion ? 1 : Math.min(1, delta * 12);
+    flashRef.current += (targetFlash - flashRef.current) * rate;
+
+    // apply texture based on current side of the swap point
+    const wantKey: "base" | string = entered
+      ? `${enteredHeader}${enteredSubhead}`
+      : "base";
+    if (lastAppliedKeyRef.current !== wantKey && flashRef.current < 0.5) {
+      // mid-fade: swap the source
+      mat.map = entered
+        ? getFlashTexture(enteredHeader, enteredSubhead)
+        : baseTexture;
+      mat.needsUpdate = true;
+      lastAppliedKeyRef.current = wantKey;
+    }
+    if (lastAppliedKeyRef.current === wantKey) {
+      // already on the right texture; nothing to do for the swap
+    }
+
+    // dip the screen brightness through the swap so it reads as a flicker
+    const dipBase = Math.abs(flashRef.current - (entered ? 0.5 : 0.5));
+    const dip = 1.0 - Math.max(0, 0.55 - dipBase * 1.1);
+
+    if (!entered && !reducedMotion) {
+      // base mode: scroll + pulse
+      baseTexture.offset.x = (baseTexture.offset.x + delta * 0.03) % 1;
+    }
+
     const t = performance.now() / 1000;
     const beat = 0.5 + 0.5 * Math.sin(t * 1.5);
-    if (topRimRef.current) topRimRef.current.opacity = 0.55 + 0.2 * beat;
-    if (botRimRef.current) botRimRef.current.opacity = 0.45 + 0.2 * beat;
-    if (screenMatRef.current) {
-      // gentle brightness modulation on the screen itself
-      const v = 0.88 + 0.12 * beat;
-      screenMatRef.current.color.setRGB(v, v, v);
+    if (topRimRef.current) {
+      topRimRef.current.opacity = (0.75 + 0.22 * beat) * dip;
     }
+    if (botRimRef.current) {
+      botRimRef.current.opacity = (0.65 + 0.22 * beat) * dip;
+    }
+    // base brightness modulation while not entered; held bright while entered
+    const v = entered ? 1.0 : 0.92 + 0.1 * beat;
+    mat.color.setRGB(v * dip, v * dip, v * dip);
   });
 
   return (
@@ -54,11 +116,11 @@ export function ArenaScreen({ reducedMotion }: Props) {
         <cylinderGeometry args={[RADIUS, RADIUS, HEIGHT, SEGMENTS, 1, true]} />
         <meshBasicMaterial
           ref={screenMatRef}
-          map={texture}
+          map={baseTexture}
           side={THREE.DoubleSide}
           toneMapped={false}
           transparent
-          opacity={0.96}
+          opacity={0.98}
         />
       </mesh>
 
@@ -69,33 +131,33 @@ export function ArenaScreen({ reducedMotion }: Props) {
           color="#0a0c1a"
           side={THREE.DoubleSide}
           transparent
-          opacity={0.32}
+          opacity={0.42}
           depthWrite={false}
         />
       </mesh>
 
       {/* emissive rim — top */}
       <mesh position={[0, HEIGHT / 2, 0]} rotation-x={-Math.PI / 2}>
-        <torusGeometry args={[RADIUS + 0.008, 0.012, 8, SEGMENTS]} />
+        <torusGeometry args={[RADIUS + 0.008, 0.014, 8, SEGMENTS]} />
         <meshBasicMaterial
           ref={topRimRef}
-          color="#dbe3ff"
+          color="#eef3ff"
           toneMapped={false}
           transparent
-          opacity={0.7}
+          opacity={0.88}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </mesh>
       {/* emissive rim — bottom */}
       <mesh position={[0, -HEIGHT / 2, 0]} rotation-x={-Math.PI / 2}>
-        <torusGeometry args={[RADIUS + 0.008, 0.014, 8, SEGMENTS]} />
+        <torusGeometry args={[RADIUS + 0.008, 0.018, 8, SEGMENTS]} />
         <meshBasicMaterial
           ref={botRimRef}
-          color="#9aa9ff"
+          color="#c9d4ff"
           toneMapped={false}
           transparent
-          opacity={0.6}
+          opacity={0.78}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -103,12 +165,12 @@ export function ArenaScreen({ reducedMotion }: Props) {
 
       {/* soft halo disc beneath the screen — fakes light spill onto the dome */}
       <mesh position={[0, -HEIGHT / 2 - 0.05, 0]} rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[RADIUS - 0.05, RADIUS + 0.35, SEGMENTS]} />
+        <ringGeometry args={[RADIUS - 0.05, RADIUS + 0.45, SEGMENTS]} />
         <meshBasicMaterial
-          color="#9aa9ff"
+          color="#a7b5ff"
           toneMapped={false}
           transparent
-          opacity={0.12}
+          opacity={0.15}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           side={THREE.DoubleSide}

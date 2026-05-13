@@ -14,16 +14,28 @@ import { LabelsRing } from "./labels-ring";
 type Props = {
   targetRotationRef: RefObject<number>;
   reducedMotion: boolean;
+  entered: boolean;
+  enteredHeader: string;
+  enteredSubhead: string;
 };
 
 const LERP_RATE = 8;
 
-export function ScreenAssembly({ targetRotationRef, reducedMotion }: Props) {
+export function ScreenAssembly({
+  targetRotationRef,
+  reducedMotion,
+  entered,
+  enteredHeader,
+  enteredSubhead,
+}: Props) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((_, delta) => {
     const g = groupRef.current;
     if (!g) return;
+    // while entered, the carousel is frozen on the section that was active
+    // when ENTER fired. don't track the input ref any further.
+    if (entered) return;
     const target = targetRotationRef.current;
     const current = g.rotation.y;
     const k = reducedMotion ? 1 : Math.min(1, delta * LERP_RATE);
@@ -32,7 +44,12 @@ export function ScreenAssembly({ targetRotationRef, reducedMotion }: Props) {
 
   return (
     <group ref={groupRef}>
-      <ArenaScreen reducedMotion={reducedMotion} />
+      <ArenaScreen
+        reducedMotion={reducedMotion}
+        entered={entered}
+        enteredHeader={enteredHeader}
+        enteredSubhead={enteredSubhead}
+      />
       <LabelsRing />
     </group>
   );

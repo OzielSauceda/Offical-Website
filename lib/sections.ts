@@ -7,7 +7,7 @@ export type SectionEnv = {
 
 export type SectionId = "about" | "projects" | "research" | "contact";
 
-export type EnvironmentId = "globe" | "pyramid";
+export type EnvironmentId = "globe" | "pyramid" | "research" | "contact-house";
 
 export type Section = {
   id: SectionId;
@@ -24,6 +24,6 @@ const HALF_PI = Math.PI / 2;
 export const SECTIONS: readonly Section[] = [
   { id: "about",    title: "About",    angle: 0,            environment: "globe",    env: {} },
   { id: "projects", title: "Projects", angle: HALF_PI,      environment: "pyramid",  env: {} },
-  { id: "research", title: "Research", angle: Math.PI,      environment: "globe",    env: {} },
-  { id: "contact",  title: "Contact",  angle: HALF_PI * 3,  environment: "globe",    env: {} },
+  { id: "research", title: "Research", angle: Math.PI,      environment: "research", env: {} },
+  { id: "contact",  title: "Contact",  angle: HALF_PI * 3,  environment: "contact-house", env: {} },
 ];

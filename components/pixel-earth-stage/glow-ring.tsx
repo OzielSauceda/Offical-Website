@@ -7,82 +7,156 @@ import * as THREE from "three";
 
 type Props = {
   reducedMotion: boolean;
+  isGlobeEnvironment: boolean;
 };
 
-// scaled to match globe radius 1.52
-const R_INNER = 1.53;
-const R_MID = 1.58;
-const R_OUTER = 1.71;
-const R_FLAT_IN = 1.79;
-const R_FLAT_OUT = 2.46;
+// dome radius is 1.82. all rim layers sit just outside that perimeter and
+// rely on the dome's own depth to mask the back half — no depthTest-off
+// arcs, which were producing vertical streaks where the partial torus
+// endpoints clipped through the dome silhouette on the sides.
+const DOME_R = 1.82;
+const R_PLATFORM = 2.36;
+const R_CORE = DOME_R + 0.008;
+const R_HOT = DOME_R + 0.02;
+const R_HALO = DOME_R + 0.05;
+const R_BLOOM = DOME_R + 0.14;
+const R_FLAT_IN = DOME_R + 0.004;
+const R_FLAT_OUT = DOME_R + 0.07;
+const R_SPILL_IN = DOME_R + 0.22;
+const R_SPILL_OUT = R_PLATFORM + 0.05;
+const R_SPILL_FAR_OUT = R_PLATFORM + 0.85;
 
-export function GlowRing({ reducedMotion }: Props) {
-  const breatheRef = useRef<THREE.Group>(null);
-  const inner = useRef<THREE.MeshBasicMaterial>(null);
-  const mid = useRef<THREE.MeshBasicMaterial>(null);
-  const outer = useRef<THREE.MeshBasicMaterial>(null);
-  const flare = useRef<THREE.MeshBasicMaterial>(null);
+export function GlowRing({ reducedMotion, isGlobeEnvironment }: Props) {
+  const groupRef = useRef<THREE.Group>(null);
+  const coreRef = useRef<THREE.MeshBasicMaterial>(null);
+  const hotRef = useRef<THREE.MeshBasicMaterial>(null);
+  const flatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const haloRef = useRef<THREE.MeshBasicMaterial>(null);
+  const bloomRef = useRef<THREE.MeshBasicMaterial>(null);
 
   useFrame(({ clock }) => {
-    if (reducedMotion || !breatheRef.current) return;
+    if (!groupRef.current) return;
+    groupRef.current.visible = isGlobeEnvironment;
+    if (!isGlobeEnvironment || reducedMotion) return;
+    // very subtle steady breathing — stage light, not a heartbeat
     const t = clock.getElapsedTime();
-    const beat = 0.5 + 0.5 * Math.sin(t * 1.5);
-    const scale = 1 + 0.02 * beat;
-    breatheRef.current.scale.set(scale, 1, scale);
-    if (mid.current) mid.current.opacity = 0.38 + 0.18 * beat;
-    if (outer.current) outer.current.opacity = 0.14 + 0.1 * beat;
-    if (flare.current) flare.current.opacity = 0.05 + 0.05 * beat;
-    if (inner.current) {
-      const shimmer = 0.9 + 0.1 * Math.sin(t * 6);
-      inner.current.color.setRGB(shimmer, shimmer, 1);
-    }
+    const beat = 0.5 + 0.5 * Math.sin(t * 0.7);
+    if (haloRef.current) haloRef.current.opacity = 0.6 + 0.04 * beat;
+    if (bloomRef.current) bloomRef.current.opacity = 0.24 + 0.03 * beat;
+    if (hotRef.current) hotRef.current.opacity = 0.82 + 0.04 * beat;
+    if (flatRef.current) flatRef.current.opacity = 0.7 + 0.04 * beat;
   });
 
   return (
-    <group position={[0, -0.01, 0]} ref={breatheRef}>
-      {/* sharp filament */}
-      <mesh rotation-x={-Math.PI / 2}>
-        <torusGeometry args={[R_INNER, 0.016, 8, 160]} />
-        <meshBasicMaterial ref={inner} color="#e6ecff" toneMapped={false} />
-      </mesh>
-      {/* mid halo */}
-      <mesh rotation-x={-Math.PI / 2}>
-        <torusGeometry args={[R_MID, 0.044, 8, 160]} />
-        <meshBasicMaterial
-          ref={mid}
-          color="#9aa9ff"
-          toneMapped={false}
+    <group ref={groupRef} position={[0, -0.01, 0]}>
+      {/* dark platform disc — plinth the rim sits on */}
+      <mesh position={[0, -0.085, 0]}>
+        <cylinderGeometry args={[R_PLATFORM, R_PLATFORM, 0.1, 160]} />
+        <meshStandardMaterial
+          color="#0b0c16"
+          roughness={0.78}
+          metalness={0.12}
           transparent
-          opacity={0.45}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
+          opacity={0.96}
         />
       </mesh>
-      {/* outer bloom */}
-      <mesh rotation-x={-Math.PI / 2}>
-        <torusGeometry args={[R_OUTER, 0.104, 8, 160]} />
+
+      {/* very wide soft spill on the platform — kept dim so it never competes
+          with the rim. two stacked low-opacity rings fade outward */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.022, 0]}>
+        <ringGeometry args={[R_SPILL_IN, R_SPILL_OUT, 160]} />
         <meshBasicMaterial
-          ref={outer}
-          color="#9aa9ff"
+          color="#f4e2c0"
           toneMapped={false}
           transparent
-          opacity={0.18}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-      {/* flat halo disc — fakes light scatter into the surrounding fog */}
-      <mesh rotation-x={-Math.PI / 2}>
-        <ringGeometry args={[R_FLAT_IN, R_FLAT_OUT, 160]} />
-        <meshBasicMaterial
-          ref={flare}
-          color="#a4b3ff"
-          toneMapped={false}
-          transparent
-          opacity={0.08}
+          opacity={0.09}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
           side={THREE.DoubleSide}
+        />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]}>
+        <ringGeometry args={[R_PLATFORM * 0.9, R_SPILL_FAR_OUT, 160]} />
+        <meshBasicMaterial
+          color="#fff1d2"
+          toneMapped={false}
+          transparent
+          opacity={0.04}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* outer bloom torus — soft warm halo blossoming out from the filament.
+          full ring, normal depth — back half is naturally hidden by the dome */}
+      <mesh rotation-x={-Math.PI / 2} renderOrder={5}>
+        <torusGeometry args={[R_BLOOM, 0.11, 12, 220]} />
+        <meshBasicMaterial
+          ref={bloomRef}
+          color="#ffdc92"
+          toneMapped={false}
+          transparent
+          opacity={0.26}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* tight creamy halo against the core */}
+      <mesh rotation-x={-Math.PI / 2} renderOrder={6}>
+        <torusGeometry args={[R_HALO, 0.04, 14, 240]} />
+        <meshBasicMaterial
+          ref={haloRef}
+          color="#fff1c8"
+          toneMapped={false}
+          transparent
+          opacity={0.62}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* hot bloom right against the core — thin layer of additive white that
+          sells the rim as a real light source */}
+      <mesh rotation-x={-Math.PI / 2} renderOrder={7}>
+        <torusGeometry args={[R_HOT, 0.018, 14, 260]} />
+        <meshBasicMaterial
+          ref={hotRef}
+          color="#fff6d0"
+          toneMapped={false}
+          transparent
+          opacity={0.82}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* flat warm ring lying on the platform plane right against the dome.
+          gives the rim a clean horizontal ellipse from the camera angle and
+          lights the seam without climbing any of the dome's vertical surface */}
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.001, 0]} renderOrder={8}>
+        <ringGeometry args={[R_FLAT_IN, R_FLAT_OUT, 200]} />
+        <meshBasicMaterial
+          ref={flatRef}
+          color="#fff4cc"
+          toneMapped={false}
+          transparent
+          opacity={0.72}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* warm-white core filament — thin, opaque, full ring. naturally only
+          visible across the front half because the dome occludes the back */}
+      <mesh rotation-x={-Math.PI / 2} renderOrder={9}>
+        <torusGeometry args={[R_CORE, 0.0105, 14, 260]} />
+        <meshBasicMaterial
+          ref={coreRef}
+          color="#fff8df"
+          toneMapped={false}
         />
       </mesh>
     </group>

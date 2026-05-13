@@ -6,10 +6,10 @@ import * as THREE from "three";
 
 import { createLabelsTexture } from "./textures";
 
-// slightly outside the screen cylinder (RADIUS=1.78) to avoid z-fight
-const RADIUS = 1.785;
-const HEIGHT = 0.85;
-const Y = 2.85;
+// slightly outside the screen cylinder (RADIUS=1.96) to avoid z-fight
+const RADIUS = 1.965;
+const HEIGHT = 0.82;
+const Y = 2.87;
 const SEGMENTS = 96;
 
 export function LabelsRing() {

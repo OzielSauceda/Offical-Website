@@ -4,7 +4,7 @@ import { RefObject } from "react";
 
 import { Canvas } from "@react-three/fiber";
 
-import type { EnvironmentId } from "@/lib/sections";
+import type { EnvironmentId, SectionId } from "@/lib/sections";
 
 import { Scene } from "./scene";
 
@@ -15,6 +15,10 @@ type Props = {
   reducedMotion: boolean;
   screenRotationTargetRef: RefObject<number>;
   environment: EnvironmentId;
+  enteredSectionId: SectionId | null;
+  enteredHeader: string;
+  enteredSubhead: string;
+  contentRingRotationRef: RefObject<number>;
 };
 
 export function StageCanvas({
@@ -24,10 +28,14 @@ export function StageCanvas({
   reducedMotion,
   screenRotationTargetRef,
   environment,
+  enteredSectionId,
+  enteredHeader,
+  enteredSubhead,
+  contentRingRotationRef,
 }: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 1.75, 5.6], fov: 62 }}
+      camera={{ position: [0, 1.72, 4.85], fov: 64 }}
       dpr={[1, 2]}
       gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
     >
@@ -38,6 +46,10 @@ export function StageCanvas({
         reducedMotion={reducedMotion}
         screenRotationTargetRef={screenRotationTargetRef}
         environment={environment}
+        enteredSectionId={enteredSectionId}
+        enteredHeader={enteredHeader}
+        enteredSubhead={enteredSubhead}
+        contentRingRotationRef={contentRingRotationRef}
       />
     </Canvas>
   );

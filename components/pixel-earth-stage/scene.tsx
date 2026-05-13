@@ -1,20 +1,26 @@
 "use client";
 
-import {
-  type ComponentRef,
-  RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
+import { RefObject } from "react";
 
-import { OrbitControls } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
-import * as THREE from "three";
+import { Stars } from "@react-three/drei";
 
-import type { EnvironmentId } from "@/lib/sections";
+import { SECTION_CAMERA_TARGETS } from "@/lib/section-camera-targets";
+import type { EnvironmentId, SectionId } from "@/lib/sections";
 
-import { YeezusMountainDebug } from "./yeezus-mountain-debug";
+import { CameraRig } from "./camera-rig";
+import { ContactHouseStage } from "./contact-house-stage";
+import { Dome } from "./dome";
+import { DomeLiftGroup } from "./dome-lift-group";
+import { DomeRimGlow } from "./dome-rim-glow";
+import { DomeSmoke } from "./dome-smoke";
+import { GlowRing } from "./glow-ring";
+import { PixelCharacter } from "./pixel-character";
+import { ResearchBridgeStage } from "./research-bridge-stage";
+import { ScreenAssembly } from "./screen-assembly";
+import { SectionRevealHost } from "./section-reveals/section-reveal-host";
+import { ShootingStars } from "./shooting-stars";
+import { StageBeams } from "./stage-beams";
+import { YeezusMountainStage } from "./yeezus-mountain-stage";
 
 type Props = {
   targetRotationRef: RefObject<number>;
@@ -23,115 +29,125 @@ type Props = {
   reducedMotion: boolean;
   screenRotationTargetRef: RefObject<number>;
   environment: EnvironmentId;
+  enteredSectionId: SectionId | null;
+  enteredHeader: string;
+  enteredSubhead: string;
+  contentRingRotationRef: RefObject<number>;
 };
 
-const DEBUG_CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
-
-const DEBUG_CAMERA_VIEWS = {
-  default: {
-    position: new THREE.Vector3(0, 1.75, 5.6),
-    up: new THREE.Vector3(0, 1, 0),
-  },
-  front: {
-    position: new THREE.Vector3(0, 0.1, 6),
-    up: new THREE.Vector3(0, 1, 0),
-  },
-  right: {
-    position: new THREE.Vector3(6, 0.1, 0),
-    up: new THREE.Vector3(0, 1, 0),
-  },
-  left: {
-    position: new THREE.Vector3(-6, 0.1, 0),
-    up: new THREE.Vector3(0, 1, 0),
-  },
-  top: {
-    position: new THREE.Vector3(0, 6, 0.001),
-    up: new THREE.Vector3(0, 0, -1),
-  },
-} as const;
-
-type DebugCameraView = keyof typeof DEBUG_CAMERA_VIEWS;
-
-function DebugCameraControls() {
-  const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
-  const { camera } = useThree();
-
-  const setView = useCallback(
-    (view: DebugCameraView) => {
-      const controls = controlsRef.current;
-      const config = DEBUG_CAMERA_VIEWS[view];
-
-      camera.position.copy(config.position);
-      camera.up.copy(config.up);
-      camera.lookAt(DEBUG_CAMERA_TARGET);
-
-      if (controls) {
-        controls.target.copy(DEBUG_CAMERA_TARGET);
-        controls.update();
-      }
-    },
-    [camera],
-  );
-
-  useEffect(() => {
-    setView("default");
-  }, [setView]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const key = event.key.toLowerCase();
-
-      if (key === "0" || key === "d") {
-        setView("default");
-        return;
-      }
-
-      if (key === "f") {
-        setView("front");
-        return;
-      }
-
-      if (key === "r") {
-        setView("right");
-        return;
-      }
-
-      if (key === "l") {
-        setView("left");
-        return;
-      }
-
-      if (key === "t") {
-        setView("top");
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [setView]);
-
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enableDamping
-      dampingFactor={0.08}
-      minDistance={2.2}
-      maxDistance={10}
-      target={DEBUG_CAMERA_TARGET}
-    />
-  );
-}
+const STAGE_Y = 0;
 
 export function Scene(props: Props) {
+  const isGlobeEnvironment = props.environment === "globe";
+  const isPyramidEnvironment = props.environment === "pyramid";
+  const isResearchEnvironment = props.environment === "research";
+  const isContactEnvironment = props.environment === "contact-house";
+  const isAboutEntered = props.enteredSectionId === "about";
+  const isEntered = props.enteredSectionId !== null;
+  const enteredCameraTarget = props.enteredSectionId
+    ? SECTION_CAMERA_TARGETS[props.enteredSectionId]
+    : null;
+
   return (
     <>
-      <color attach="background" args={["#f4f4f0"]} />
-      <ambientLight intensity={0.9} />
-      <directionalLight position={[3, 4, 5]} intensity={1.4} color="#ffffff" />
-      <DebugCameraControls />
-      <group name={`debug-${props.environment}`}>
-        <YeezusMountainDebug />
+      <fog attach="fog" args={["#03040b", 2.6, 7.8]} />
+      {/* ambient kept high enough that the photographic earth texture reads
+          across the whole upper hemisphere, not just inside the hot spot */}
+      <ambientLight intensity={0.72} />
+      {/* hero overhead spotlight — wide cone bathes the dome from above so
+          the whole upper hemisphere catches the cool stage light, brighter
+          at the top where it focuses on the performer. spotLight default
+          target sits at world origin, so a source at (0, 5.2, 0) projects
+          straight down. */}
+      <spotLight
+        position={[0, 5.35, 0.08]}
+        angle={0.46}
+        penumbra={0.82}
+        distance={10}
+        decay={1.08}
+        intensity={9.2}
+        color="#eaf2ff"
+      />
+      {/* warm rear fill — keeps the back of the dome from going flat black */}
+      <directionalLight position={[-2.6, 1.8, 2]} intensity={0.58} color="#f2d8a8" />
+      <pointLight position={[-2.8, 0.9, 1.6]} intensity={1.2} distance={5.5} color="#bfffdc" />
+      <pointLight position={[2.8, 0.9, 1.6]} intensity={1.0} distance={5.5} color="#a9c9ff" />
+      <hemisphereLight args={["#8fa4d5", "#0c0a1c", 0.42]} />
+
+      <CameraRig
+        reducedMotion={props.reducedMotion}
+        enteredCameraTarget={enteredCameraTarget}
+      />
+
+      {!props.reducedMotion && (
+        <>
+          <Stars radius={32} depth={22} count={900} factor={2.2} fade speed={0.35} />
+          <ShootingStars />
+        </>
+      )}
+
+      <group position={[0, STAGE_Y, 0]}>
+        <DomeLiftGroup entered={isAboutEntered} reducedMotion={props.reducedMotion}>
+          <Dome
+            targetRotationRef={props.targetRotationRef}
+            isDraggingRef={props.isDraggingRef}
+            lastInteractionRef={props.lastInteractionRef}
+            reducedMotion={props.reducedMotion}
+            isGlobeEnvironment={isGlobeEnvironment}
+          />
+          <GlowRing
+            reducedMotion={props.reducedMotion}
+            isGlobeEnvironment={isGlobeEnvironment}
+          />
+          <DomeRimGlow isGlobeEnvironment={isGlobeEnvironment} />
+          <DomeSmoke
+            targetRotationRef={props.targetRotationRef}
+            reducedMotion={props.reducedMotion}
+            isGlobeEnvironment={isGlobeEnvironment}
+          />
+        </DomeLiftGroup>
+        <ScreenAssembly
+          targetRotationRef={props.screenRotationTargetRef}
+          reducedMotion={props.reducedMotion}
+          entered={isEntered}
+          enteredHeader={props.enteredHeader}
+          enteredSubhead={props.enteredSubhead}
+        />
+        <StageBeams
+          reducedMotion={props.reducedMotion}
+          isGlobeEnvironment={isGlobeEnvironment}
+          cueMode={isEntered ? "entered" : "default"}
+        />
+        <SectionRevealHost
+          enteredSectionId={props.enteredSectionId}
+          reducedMotion={props.reducedMotion}
+          ringRotationRef={props.contentRingRotationRef}
+        />
+        <PixelCharacter
+          reducedMotion={props.reducedMotion}
+          isGlobeEnvironment={isGlobeEnvironment}
+        />
+        <YeezusMountainStage
+          targetRotationRef={props.targetRotationRef}
+          isDraggingRef={props.isDraggingRef}
+          lastInteractionRef={props.lastInteractionRef}
+          reducedMotion={props.reducedMotion}
+          isPyramidEnvironment={isPyramidEnvironment}
+        />
+        <ResearchBridgeStage
+          targetRotationRef={props.targetRotationRef}
+          isDraggingRef={props.isDraggingRef}
+          lastInteractionRef={props.lastInteractionRef}
+          reducedMotion={props.reducedMotion}
+          isResearchEnvironment={isResearchEnvironment}
+        />
+        <ContactHouseStage
+          targetRotationRef={props.targetRotationRef}
+          isDraggingRef={props.isDraggingRef}
+          lastInteractionRef={props.lastInteractionRef}
+          reducedMotion={props.reducedMotion}
+          isContactEnvironment={isContactEnvironment}
+        />
       </group>
     </>
   );
