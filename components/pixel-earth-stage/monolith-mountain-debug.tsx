@@ -596,7 +596,7 @@ function useLogButton() {
         }
         dump[label] = verts;
       }
-      console.log("=== Yeezus mountain vertices ===");
+      console.log("=== Monolith mountain vertices ===");
       console.log(JSON.stringify(dump, null, 2));
     }),
     "Log as TS Code": button((get) => {
@@ -628,7 +628,7 @@ function useLogButton() {
   });
 }
 
-export function YeezusMountainDebug() {
+export function MonolithMountainDebug() {
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const onFocus = useCallback((path: string | null) => {
     setEditingPath(path);

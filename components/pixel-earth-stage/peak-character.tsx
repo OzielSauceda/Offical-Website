@@ -1,6 +1,6 @@
 "use client";
 
-// pixel character that stands on top of the Yeezus mountain peak.
+// pixel character that stands on top of the monolith mountain peak.
 // renders inside the scaled mountain group, so the sprite scale and resting y
 // are passed in local coords (compensating for the parent's MODEL_SCALE).
 

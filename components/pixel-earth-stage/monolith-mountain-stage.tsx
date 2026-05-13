@@ -1,7 +1,7 @@
 "use client";
 
-// Yeezus-style carved stone mountain — production version for the Projects environment.
-// Geometry was tuned in yeezus-mountain-debug.tsx; this is the production render.
+// Carved stone monolith mountain. Production version for the Projects environment.
+// Geometry was tuned in monolith-mountain-debug.tsx; this is the production render.
 
 import { RefObject, useEffect, useMemo, useRef } from "react";
 
@@ -316,7 +316,7 @@ type Props = {
   isPyramidEnvironment: boolean;
 };
 
-export function YeezusMountainStage({
+export function MonolithMountainStage({
   targetRotationRef,
   isDraggingRef,
   lastInteractionRef,

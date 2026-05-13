@@ -20,7 +20,7 @@ import { ScreenAssembly } from "./screen-assembly";
 import { SectionRevealHost } from "./section-reveals/section-reveal-host";
 import { ShootingStars } from "./shooting-stars";
 import { StageBeams } from "./stage-beams";
-import { YeezusMountainStage } from "./yeezus-mountain-stage";
+import { MonolithMountainStage } from "./monolith-mountain-stage";
 
 type Props = {
   targetRotationRef: RefObject<number>;
@@ -148,7 +148,7 @@ export function Scene(props: Props) {
           reducedMotion={props.reducedMotion}
           ringRotationRef={props.contentRingRotationRef}
         />
-        <YeezusMountainStage
+        <MonolithMountainStage
           targetRotationRef={props.targetRotationRef}
           isDraggingRef={props.isDraggingRef}
           lastInteractionRef={props.lastInteractionRef}

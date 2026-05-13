@@ -1,6 +1,6 @@
 "use client";
 
-// Donda-style weathered church-house on a dirt mound for the Contact env.
+// Weathered church-house on a dirt mound for the Contact env.
 // Compact: a main rectangular body with a steep front gable + shingle roof,
 // a small side wing projecting toward the camera, a porch with iron railings
 // and stairs, a glowing white rooftop cross, a thin chimney, and several

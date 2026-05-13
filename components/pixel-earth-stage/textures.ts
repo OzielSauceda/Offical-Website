@@ -502,7 +502,7 @@ export function createCassetteFaceTexture(
     ctx.fillRect(x, y, 1, 1);
   }
 
-  // ── top text: owner name (where "KANYE WEST" lives on the reference) ──
+  // ── top text: owner name (large all-caps line at the top of the face) ──
   ctx.fillStyle = "#1a1614";
   ctx.font = `400 36px "Times New Roman", "Garamond", serif`;
   ctx.textAlign = "center";
@@ -538,7 +538,7 @@ export function createCassetteFaceTexture(
   ctx.closePath();
   ctx.fill();
 
-  // ── subtitle: slab keyword (where "808s & HEARTBREAK" sits) ──
+  // ── subtitle: slab keyword (large keyword line under the heart icon) ──
   ctx.fillStyle = "#1a1614";
   ctx.font = `400 38px "Times New Roman", "Garamond", serif`;
   letterSpacingSetter.letterSpacing = "10px";
@@ -1484,8 +1484,8 @@ export function createSlabFaceTexture(
     ctx.fillText(upperHeading, 32, H * 0.5);
     (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = "0px";
 
-    // hand-scrawled white spraypaint arrow next to the keyword — a tiny
-    // mark, very Kanye-merch coded
+    // hand-scrawled white spraypaint arrow next to the keyword. a tiny
+    // mark with a tour-merch feel.
     ctx.strokeStyle = "rgba(248, 240, 220, 0.85)";
     ctx.lineWidth = 4;
     ctx.lineCap = "round";
@@ -2013,7 +2013,7 @@ export function createDirtMoundTexture(): THREE.CanvasTexture {
 }
 
 // pale window pane with a grid of mullions and a soft warm interior wash —
-// shape mirrors the Donda church windows: tall, narrow, 2 columns × 3 rows
+// shape mirrors weathered church windows: tall, narrow, 2 columns × 3 rows
 // of small panes. gridCols/gridRows let callers swap to a 3×3 attic style.
 export function createWindowGlowTexture(
   gridCols: number = 2,

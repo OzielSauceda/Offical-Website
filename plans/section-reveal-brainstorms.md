@@ -19,7 +19,7 @@ The rotating arena screen tilts forward toward the camera and zooms to fill the 
 - Stage beams dim ~40%, environment fog density raised slightly.
 - Exit: back chevron at top-left or ESC reverses the zoom; carousel resumes.
 
-**Feels like:** Donda listening party — the screen rolls forward, becomes everything.
+**Feels like:** an arena listening party. The screen rolls forward, becomes everything.
 
 **Trade-off:** uses an element that's already there; the existing rotating screen IS the navigation surface, so reusing it for content is conceptually tight. R3F-to-HTML alignment is fiddly; `<Html transform>` can blur small type unless `distanceFactor` is tuned. Content size constrained by screen aspect.
 
@@ -103,7 +103,7 @@ The rotating arena screen above the stage swells massively, descends past the ca
 
 ### Concept Z — Performer Hydraulic Lift
 
-Stage beams dim. The character is lifted on a glowing hidden stage elevator (~1.5u up). The environment falls away below. Around the character at the new height, a circular platform forms and content cards rise on pillars in a semicircle. Camera tilts up to track. Feels like a Kanye performance moment — the artist being raised into the spotlight to deliver the next song.
+Stage beams dim. The character is lifted on a glowing hidden stage elevator (~1.5u up). The environment falls away below. Around the character at the new height, a circular platform forms and content cards rise on pillars in a semicircle. Camera tilts up to track. Feels like a big-stage performance moment, with the performer being raised into the spotlight to deliver the next song.
 
 **Why this wows:** direct quote from concert staging. Same mechanic for every section, but the elevator move is dramatic and the height shift makes content feel like it's being delivered from on high.
 
@@ -119,7 +119,7 @@ Picked X. The argument was: the four distinct environments are the site's bigges
 
 ## What we actually shipped
 
-The plan was Concept X with stone monolith slabs as the props. After the slabs landed and read as "warehouse stage props" rather than Kanye-coded, the prop component got swapped twice more:
+The plan was Concept X with stone monolith slabs as the props. After the slabs landed and read as "warehouse stage props" rather than tour-coded, the prop component got swapped twice more:
 
 1. Stone monoliths → "listening-set cards" with track numbers and dividers → felt like a generic concert setlist
 2. → album-cover treatments (cream/black/red palette, three different cover styles per slab) → closer but still abstract
