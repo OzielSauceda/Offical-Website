@@ -6,7 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 const AUTO_SPEED = 0.14;
-const RESUME_DELAY_MS = 6500;
+const RESUME_DELAY_MS = 1800;
 const DOME_RADIUS = 1.82;
 
 type Props = {
@@ -33,14 +33,86 @@ export function Dome({
   // so the map sampler is actually wired in (passing it through a state-backed
   // JSX prop leaves the material rendering unmapped/gray on the first hit).
   useEffect(() => {
-    const loader = new THREE.TextureLoader();
     let disposed = false;
     let loadedTex: THREE.Texture | null = null;
-    loader.load("/textures/earth-blue-marble.jpg", (tex) => {
-      if (disposed) {
-        tex.dispose();
-        return;
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      if (disposed) return;
+      // posterize the blue marble into a flat cartoon-globe palette.
+      // continent shapes and ocean layout come straight from the source
+      // pixels, but photographic micro-detail collapses into ~6 flat
+      // regions (ocean, shallow, forest, plains, desert, ice). reads as
+      // a stylized illustrated globe instead of a NASA poster, while
+      // still being unambiguously Earth.
+      const sw = img.naturalWidth;
+      const sh = img.naturalHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, sw, sh);
+      const imgData = ctx.getImageData(0, 0, sw, sh);
+      const data = imgData.data;
+
+      // flat cartoon-earth palette. saturations are tuned so the result
+      // looks illustrated, not neon — and so it still sits inside the
+      // stage's warm key light.
+      const OCEAN_DEEP: [number, number, number] = [26, 66, 118];
+      const OCEAN: [number, number, number] = [48, 100, 160];
+      const SHALLOW: [number, number, number] = [86, 142, 184];
+      const FOREST: [number, number, number] = [70, 132, 78];
+      const GRASS: [number, number, number] = [128, 172, 92];
+      const PLAINS: [number, number, number] = [196, 188, 122];
+      const DESERT: [number, number, number] = [218, 188, 130];
+      const ICE: [number, number, number] = [232, 234, 232];
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i] ?? 0;
+        const g = data[i + 1] ?? 0;
+        const b = data[i + 2] ?? 0;
+        const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+        const maxC = Math.max(r, g, b);
+        const minC = Math.min(r, g, b);
+        const chroma = (maxC - minC) / 255;
+
+        // ice / snow / clouds: bright + nearly neutral
+        if (lum > 0.78 && chroma < 0.12) {
+          data[i] = ICE[0];
+          data[i + 1] = ICE[1];
+          data[i + 2] = ICE[2];
+          continue;
+        }
+
+        // water: blue dominant over red and at/over green
+        const isWater = b > r + 10 && b >= g - 4;
+        if (isWater) {
+          let c: [number, number, number];
+          if (lum < 0.28) c = OCEAN_DEEP;
+          else if (lum < 0.5) c = OCEAN;
+          else c = SHALLOW;
+          data[i] = c[0];
+          data[i + 1] = c[1];
+          data[i + 2] = c[2];
+          continue;
+        }
+
+        // land: classify by green dominance and warmth
+        const greenDom = g - Math.max(r, b);
+        const warmth = r + g - 2 * b;
+        let c: [number, number, number];
+        if (greenDom > 6 && lum < 0.42) c = FOREST;
+        else if (greenDom > 0) c = GRASS;
+        else if (warmth > 60 && lum > 0.55) c = DESERT;
+        else c = PLAINS;
+        data[i] = c[0];
+        data[i + 1] = c[1];
+        data[i + 2] = c[2];
       }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
       tex.wrapS = THREE.RepeatWrapping;
       tex.wrapT = THREE.ClampToEdgeWrapping;
       // sample only the northern hemisphere of the equirectangular image.
@@ -64,7 +136,9 @@ export function Dome({
         mat.emissiveMap = tex;
         mat.needsUpdate = true;
       }
-    });
+    };
+    img.src = "/textures/earth-blue-marble.jpg";
+
     return () => {
       disposed = true;
       loadedTex?.dispose();

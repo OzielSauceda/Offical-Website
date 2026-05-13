@@ -59,7 +59,10 @@ export function PixelEarthStage() {
   // content-ring rotation: 3 stops for now (About has 3 slabs). when the
   // first non-About reveal lands with a different slab count, we can lift
   // this to read from SECTION_CONTENT.
-  const contentRing = useContentRingRotation(3);
+  // 3 cassettes spaced 60° apart in a front-facing fan (not a full ring),
+  // so the snap step is π/3 not 2π/3. clamps the swipe range to ±60° so
+  // the user can only land on the three actual cassette positions.
+  const contentRing = useContentRingRotation(3, Math.PI / 3);
 
   // track whether the carousel is "settled" so the ENTER chip only appears
   // when there is a centered section to enter. polled on a short interval
@@ -84,8 +87,11 @@ export function PixelEarthStage() {
   }, [enteredSectionId, contentRing]);
 
   // GLOBE zone — drag-to-spin only. No section nav.
+  // disabled when a section is entered so interactive props inside the
+  // section reveal (cassettes etc.) don't kick off a globe spin.
   const onGlobePointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
+      if (enteredSectionId !== null) return;
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -96,7 +102,7 @@ export function PixelEarthStage() {
       lastInteractionRef.current = performance.now();
       setGrabbing(true);
     },
-    [],
+    [enteredSectionId],
   );
 
   const onGlobePointerMove = useCallback((e: PointerEvent<HTMLDivElement>) => {

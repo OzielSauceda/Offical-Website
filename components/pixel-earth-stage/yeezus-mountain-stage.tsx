@@ -8,7 +8,6 @@ import { RefObject, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-import { PeakCharacter } from "./peak-character";
 
 type Vertex = readonly [number, number, number];
 type Face = readonly [number, number, number, ...number[]];
@@ -401,17 +400,6 @@ export function YeezusMountainStage({
         <mesh geometry={ledgeGeo} material={ledgeMat} />
         <mesh geometry={upperGeo} material={upperMat} />
         <mesh geometry={peakGeo} material={peakMat} />
-        {/* peak vertex is v5 = (1.18, 2.3, -1.32) in this frame.
-            sprite local scale 0.913 gives a world-space scale of 0.42 (same
-            as the globe character), and y = peak + half the sprite height so
-            the character stands on the peak instead of straddling it. */}
-        <PeakCharacter
-          isVisible={isPyramidEnvironment}
-          reducedMotion={reducedMotion}
-          position={[1.18, 2.757, -1.32]}
-          scale={0.913}
-          bobAmplitude={0.052}
-        />
       </group>
     </group>
   );

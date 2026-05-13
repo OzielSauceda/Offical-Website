@@ -43,7 +43,7 @@ export function ScreenAssembly({
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[0, 0.12, 0]}>
       <ArenaScreen
         reducedMotion={reducedMotion}
         entered={entered}

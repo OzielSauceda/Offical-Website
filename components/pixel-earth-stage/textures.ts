@@ -391,39 +391,56 @@ export function createScreenTexture(): THREE.CanvasTexture {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("no 2d ctx");
 
-  // vertical gradient — deep cool blue framing, warmer in the middle
+  // bright warm cream/ivory display surface — reads as a lit arena
+  // jumbotron face rather than a dark navy banner. vertical gradient
+  // adds a touch of brightness in the middle and a slightly cooler
+  // taper at the very edges so the screen has some volume.
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "#050611");
-  grad.addColorStop(0.2, "#121633");
-  grad.addColorStop(0.5, "#1a2044");
-  grad.addColorStop(0.8, "#11152e");
-  grad.addColorStop(1, "#04050d");
+  grad.addColorStop(0, "#e8dfc8");
+  grad.addColorStop(0.18, "#f3ead4");
+  grad.addColorStop(0.5, "#faf2dc");
+  grad.addColorStop(0.82, "#ece2c6");
+  grad.addColorStop(1, "#cbbf9d");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // pooled warm light around the circumference — six spots, evenly placed
+  // pooled warm light around the circumference — six soft bright spots
+  // that feel like backlight on the screen face. mixing warm + cool
+  // for slight chromatic variation.
   const POOLS = 6;
   for (let i = 0; i < POOLS; i++) {
     const cx = (W / POOLS) * (i + 0.5);
     const cy = H * 0.5;
-    const rad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 120);
-    const warm = i % 2 === 0 ? "rgba(255, 190, 150, 0.22)" : "rgba(180, 205, 255, 0.26)";
+    const rad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 140);
+    const warm =
+      i % 2 === 0 ? "rgba(255, 232, 188, 0.34)" : "rgba(248, 240, 220, 0.30)";
     rad.addColorStop(0, warm);
     rad.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = rad;
-    ctx.fillRect(cx - 140, cy - 140, 280, 280);
+    ctx.fillRect(cx - 160, cy - 160, 320, 320);
   }
 
-  // horizontal scanlines — faint, every 4px
-  ctx.fillStyle = "rgba(255, 255, 255, 0.032)";
+  // faint warm scanlines for screen texture
+  ctx.fillStyle = "rgba(120, 92, 48, 0.05)";
   for (let y = 0; y < H; y += 4) {
     ctx.fillRect(0, y, W, 1);
   }
 
-  // top + bottom emissive trim
-  ctx.fillStyle = "rgba(230, 238, 255, 0.72)";
-  ctx.fillRect(0, 0, W, 2);
-  ctx.fillRect(0, H - 2, W, 2);
+  // bright top trim — emissive edge where the screen frame catches the
+  // overhead light most strongly.
+  ctx.fillStyle = "rgba(255, 245, 220, 0.95)";
+  ctx.fillRect(0, 0, W, 3);
+
+  // darker lower band — structural underside / skirt baked into the
+  // bottom ~16% of the texture so the screen reads as a bright face on
+  // a darker support, like the reference jumbotrons.
+  const bandTop = Math.floor(H * 0.84);
+  const bandGrad = ctx.createLinearGradient(0, bandTop, 0, H);
+  bandGrad.addColorStop(0, "rgba(28, 22, 16, 0)");
+  bandGrad.addColorStop(0.4, "rgba(28, 22, 16, 0.72)");
+  bandGrad.addColorStop(1, "rgba(14, 10, 6, 0.96)");
+  ctx.fillStyle = bandGrad;
+  ctx.fillRect(0, bandTop, W, H - bandTop);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.magFilter = THREE.LinearFilter;
@@ -523,9 +540,9 @@ export function createCassetteFaceTexture(
 
   // ── subtitle: slab keyword (where "808s & HEARTBREAK" sits) ──
   ctx.fillStyle = "#1a1614";
-  ctx.font = `400 22px "Times New Roman", "Garamond", serif`;
+  ctx.font = `400 38px "Times New Roman", "Garamond", serif`;
   letterSpacingSetter.letterSpacing = "10px";
-  ctx.fillText(upperHeading, W / 2 + 5, 166);
+  ctx.fillText(upperHeading, W / 2 + 5, 176);
   letterSpacingSetter.letterSpacing = "0px";
 
   // ── vertical "SIDE A/B/C" marker on the left, between top text and reels ──
@@ -783,6 +800,184 @@ export function createCassetteFaceTexture(
   drawScrew(ctx, 32, 32);
   drawScrew(ctx, W - 32, 32);
   drawScrew(ctx, W / 2, 600);
+
+  // reset text defaults
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// cassette-back texture for the About section reveal. quieter than the
+// face — same off-white plastic palette but no title/heart/colored
+// stripe. shows the molded back of the cassette: horizontal top/bottom
+// seam bands, a thin vertical center seam, two reel spindle holes
+// (mirrored from the face), a small tape window in the middle, corner
+// screws + a center-bottom screw, small notches, a faint Dolby NR
+// stamp, a "MADE IN U.S.A." mark, and the bottom transport slots.
+export function createCassetteBackTexture(
+  seed: number,
+  sideLabel: string,
+): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 656;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  const rand = rng(0xc100 + seed * 19);
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  // off-white shell — same palette as the face
+  const shellGrad = ctx.createLinearGradient(0, 0, 0, H);
+  shellGrad.addColorStop(0, "#f6f1e7");
+  shellGrad.addColorStop(0.5, "#ece4d4");
+  shellGrad.addColorStop(1, "#d6cdb9");
+  ctx.fillStyle = shellGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // top edge highlight
+  ctx.fillStyle = "rgba(255, 248, 232, 0.55)";
+  ctx.fillRect(0, 0, W, 2);
+
+  // plastic grain
+  for (let i = 0; i < W * H * 0.018; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
+    ctx.fillStyle = `rgba(80, 70, 55, ${0.02 + rand() * 0.06})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  // top + bottom molded seam bands — where the two plastic halves
+  // clip together. paired dark + light pixel rows for a beveled edge.
+  ctx.fillStyle = "rgba(80, 65, 50, 0.20)";
+  ctx.fillRect(0, 28, W, 1);
+  ctx.fillRect(0, H - 29, W, 1);
+  ctx.fillStyle = "rgba(255, 248, 232, 0.28)";
+  ctx.fillRect(0, 29, W, 1);
+  ctx.fillRect(0, H - 28, W, 1);
+
+  // thin vertical center seam
+  ctx.fillStyle = "rgba(70, 58, 45, 0.12)";
+  ctx.fillRect(W / 2 - 1, 56, 2, H - 112);
+  ctx.fillStyle = "rgba(255, 248, 232, 0.18)";
+  ctx.fillRect(W / 2 + 1, 56, 1, H - 112);
+
+  // two spindle holes — mirrored from the face. simpler than the front
+  // (no gear teeth or J-card text) so the back reads as quieter.
+  const reelY = 320;
+  const reelR = 78;
+  const leftCX = W * 0.72;
+  const rightCX = W * 0.28;
+  const drawSpindleHole = (cx: number, cy: number, r: number) => {
+    ctx.fillStyle = "#1f1814";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#0a0706";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    // central spindle disc
+    ctx.fillStyle = "#c6bda8";
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+    // dark center pin
+    ctx.fillStyle = "#0a0706";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // faint concentric ring
+    ctx.strokeStyle = "rgba(40, 22, 14, 0.25)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2);
+    ctx.stroke();
+  };
+  drawSpindleHole(leftCX, reelY, reelR);
+  drawSpindleHole(rightCX, reelY, reelR);
+
+  // tape window slot in the center
+  const winW = W * 0.18;
+  const winH = 50;
+  const winX = (W - winW) / 2;
+  const winY = reelY - winH / 2;
+  ctx.fillStyle = "#1f1814";
+  ctx.fillRect(winX - 3, winY - 3, winW + 6, winH + 6);
+  ctx.fillStyle = "#0a0706";
+  ctx.fillRect(winX, winY, winW, winH);
+  ctx.fillStyle = "#5a3a26";
+  ctx.fillRect(winX + 4, reelY - 6, winW - 8, 12);
+  ctx.fillStyle = "rgba(200, 150, 110, 0.4)";
+  ctx.fillRect(winX + 4, reelY - 6, winW - 8, 2);
+
+  // corner screws + a fifth screw mid-bottom
+  const drawScrew = (cx: number, cy: number) => {
+    ctx.fillStyle = "rgba(60, 50, 40, 0.45)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(140, 125, 100, 0.55)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(40, 32, 24, 0.85)";
+    ctx.fillRect(cx - 5, cy - 1, 10, 2);
+    ctx.fillRect(cx - 1, cy - 5, 2, 10);
+  };
+  drawScrew(52, 56);
+  drawScrew(W - 52, 56);
+  drawScrew(52, H - 56);
+  drawScrew(W - 52, H - 56);
+  drawScrew(W / 2, H - 56);
+
+  // small notches near the top — molded plastic detail
+  ctx.fillStyle = "rgba(50, 40, 30, 0.32)";
+  ctx.fillRect(112, 20, 16, 5);
+  ctx.fillRect(W - 128, 20, 16, 5);
+
+  // faint Dolby NR stamp top-right
+  ctx.fillStyle = "rgba(40, 32, 24, 0.55)";
+  ctx.font = `600 14px "Helvetica", "Arial", sans-serif`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  letterSpacingSetter.letterSpacing = "2px";
+  ctx.fillText("DOLBY NR", W - 95, 92);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // a small SIDE marker on the left for continuity with the face
+  ctx.fillStyle = "rgba(40, 32, 24, 0.55)";
+  ctx.font = `500 14px "Times New Roman", serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  letterSpacingSetter.letterSpacing = "2px";
+  ctx.fillText(`SIDE ${sideLabel}`, 95, 92);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // made-in stamp bottom-left
+  ctx.fillStyle = "rgba(40, 32, 24, 0.42)";
+  ctx.font = `500 11px "Helvetica", "Arial", sans-serif`;
+  ctx.textAlign = "left";
+  letterSpacingSetter.letterSpacing = "1px";
+  ctx.fillText("MADE IN U.S.A.", 90, H - 92);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // bottom access slots — mirrored from the face
+  ctx.fillStyle = "rgba(50, 40, 30, 0.32)";
+  for (let i = 0; i < 4; i++) {
+    const sx = W * 0.32 + i * 30;
+    ctx.fillRect(sx, H - 18, 20, 5);
+  }
 
   // reset text defaults
   ctx.textAlign = "start";
@@ -1474,28 +1669,30 @@ export function createTitleFlashTexture(
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("no 2d ctx");
 
+  // bright cream display surface — matches the new base screen
   const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, "#04050d");
-  grad.addColorStop(0.5, "#0a0c1c");
-  grad.addColorStop(1, "#04050d");
+  grad.addColorStop(0, "#e8dfc8");
+  grad.addColorStop(0.18, "#f3ead4");
+  grad.addColorStop(0.5, "#faf2dc");
+  grad.addColorStop(0.82, "#ece2c6");
+  grad.addColorStop(1, "#cbbf9d");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // edge bleed — warm pool along the horizontal center so the title catches
-  // a hint of stage light, not just a flat black field
+  // edge bleed — warm pool along the horizontal center so the title sits
+  // on a lit-screen field
   {
     const cy = H / 2;
     const rad = ctx.createRadialGradient(W / 2, cy, 20, W / 2, cy, W / 2);
-    rad.addColorStop(0, "rgba(200, 210, 255, 0.18)");
-    rad.addColorStop(0.6, "rgba(120, 130, 200, 0.06)");
+    rad.addColorStop(0, "rgba(255, 240, 200, 0.30)");
+    rad.addColorStop(0.6, "rgba(255, 232, 188, 0.10)");
     rad.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = rad;
     ctx.fillRect(0, 0, W, H);
   }
 
-  // two-line set-list card layout. tiled four times across the cylinder so
-  // any viewing angle sees the full block. header big and brutalist; thin
-  // // divider with the section title underneath in smaller condensed type.
+  // two-line set-list card layout. tiled four times across the cylinder.
+  // dark warm ink against the bright cream display surface.
   const headerFontPx = Math.floor(H * 0.4);
   const subFontPx = Math.floor(H * 0.2);
   const upperHeader = header.toUpperCase();
@@ -1504,37 +1701,45 @@ export function createTitleFlashTexture(
   ctx.textBaseline = "middle";
   for (let i = 0; i < 4; i++) {
     const x = (W / 4) * (i + 0.5);
-    // header — heavy condensed
+    // header — heavy condensed dark warm
     ctx.font = `900 ${headerFontPx}px "Impact", "Haettenschweiler", "Arial Narrow Bold", sans-serif`;
-    ctx.fillStyle = "#f3f6ff";
-    ctx.shadowColor = "rgba(120, 160, 255, 0.55)";
-    ctx.shadowBlur = 24;
+    ctx.fillStyle = "#1c1610";
+    ctx.shadowColor = "rgba(255, 240, 200, 0.5)";
+    ctx.shadowBlur = 14;
     ctx.fillText(upperHeader, x, H * 0.36);
     ctx.shadowBlur = 0;
-    // divider
-    ctx.fillStyle = "rgba(230, 238, 255, 0.42)";
+    // divider — warm dark
+    ctx.fillStyle = "rgba(28, 22, 16, 0.55)";
     ctx.fillRect(x - 56, H * 0.58, 112, 1);
-    // subhead — section title, smaller condensed, slightly amber
+    // subhead — slightly softer dark
     ctx.font = `700 ${subFontPx}px "Impact", "Arial Narrow Bold", sans-serif`;
-    ctx.fillStyle = "#e8d5a4";
-    ctx.shadowColor = "rgba(180, 140, 80, 0.4)";
-    ctx.shadowBlur = 12;
+    ctx.fillStyle = "#3a2c1a";
+    ctx.shadowColor = "rgba(255, 232, 188, 0.4)";
+    ctx.shadowBlur = 10;
     ctx.fillText(`// ${upperSub}`, x, H * 0.76);
     ctx.shadowBlur = 0;
   }
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 
-  // scanlines
-  ctx.fillStyle = "rgba(255, 255, 255, 0.045)";
+  // faint warm scanlines
+  ctx.fillStyle = "rgba(120, 92, 48, 0.05)";
   for (let y = 0; y < H; y += 3) {
     ctx.fillRect(0, y, W, 1);
   }
 
-  // bright trim top + bottom — matches the regular screen texture
-  ctx.fillStyle = "rgba(230, 238, 255, 0.85)";
-  ctx.fillRect(0, 0, W, 2);
-  ctx.fillRect(0, H - 2, W, 2);
+  // bright top trim
+  ctx.fillStyle = "rgba(255, 245, 220, 0.95)";
+  ctx.fillRect(0, 0, W, 3);
+
+  // darker lower band — structural underside skirt
+  const bandTop = Math.floor(H * 0.84);
+  const bandGrad = ctx.createLinearGradient(0, bandTop, 0, H);
+  bandGrad.addColorStop(0, "rgba(28, 22, 16, 0)");
+  bandGrad.addColorStop(0.4, "rgba(28, 22, 16, 0.72)");
+  bandGrad.addColorStop(1, "rgba(14, 10, 6, 0.96)");
+  ctx.fillStyle = bandGrad;
+  ctx.fillRect(0, bandTop, W, H - bandTop);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.magFilter = THREE.LinearFilter;
@@ -2127,14 +2332,17 @@ function paintLabels(canvas: HTMLCanvasElement, fontFamily: string) {
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.font = `400 ${LABELS_FONT_PX}px ${fontFamily}, "Times New Roman", serif`;
-  ctx.fillStyle = "#f3f6ff";
+  // dark warm ink so the titles punch out of the bright cream display
+  // surface beneath them, like dark lettering / silhouettes on a lit
+  // arena jumbotron face.
+  ctx.fillStyle = "#1c1610";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   // letterSpacing is a modern Canvas2D property; falls back gracefully where unsupported
   (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing =
     `${LABELS_LETTER_SPACING_PX}px`;
-  ctx.shadowColor = "rgba(6, 4, 18, 0.95)";
-  ctx.shadowBlur = 22;
+  ctx.shadowColor = "rgba(255, 240, 200, 0.65)";
+  ctx.shadowBlur = 18;
 
   const cy = canvas.height / 2;
   for (const section of SECTIONS) {
@@ -2181,4 +2389,283 @@ export function createLabelsTexture(): {
   };
 
   return { texture, redraw };
+}
+
+// ── J-card panel textures ────────────────────────────────────────────
+// when a cassette is clicked it unfolds into a 3-panel J-card insert
+// (the paper liner real cassettes shipped with). these three textures
+// paint the three panels — left (title + tagline), middle (body copy),
+// right (credits). they share a paper-cream background so the panels
+// read as one continuous liner when seen unfolded.
+
+const JCARD_W = 720;
+const JCARD_H = 460;
+const CREAM_BG = "#f1e8d2";
+const CREAM_SHADOW = "#e5d9be";
+const INK_DARK = "#1a1410";
+const INK_MID = "#3a2c1c";
+const INK_SOFT = "#5a4632";
+const ACCENT_RED = "#b13b2a";
+
+function paintPaperBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  // base cream with a subtle vertical gradient — cardstock with light
+  // catching the top edge.
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#f6eedb");
+  g.addColorStop(0.5, CREAM_BG);
+  g.addColorStop(1, CREAM_SHADOW);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // very faint horizontal paper ruling so the panels read as cardstock
+  ctx.fillStyle = "rgba(58, 44, 28, 0.04)";
+  for (let y = 0; y < h; y += 3) {
+    ctx.fillRect(0, y, w, 1);
+  }
+  // micro grain
+  const rand = rng(0x4c2a + Math.floor(w * 13));
+  for (let i = 0; i < 280; i++) {
+    const x = Math.floor(rand() * w);
+    const y = Math.floor(rand() * h);
+    ctx.fillStyle = `rgba(58, 44, 28, ${0.02 + rand() * 0.05})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  // hairline inset border so the panel reads as a card, not a sticker
+  ctx.strokeStyle = "rgba(26, 20, 16, 0.18)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(8, 8, w - 16, h - 16);
+}
+
+// LEFT PANEL — track number, heading, tagline, side label.
+// reads like the front of an album liner.
+export function createJCardLeftPanelTexture(
+  trackIndex: number,
+  heading: string,
+  tagline: string,
+  sideLabel: string,
+): THREE.CanvasTexture {
+  const W = JCARD_W;
+  const H = JCARD_H;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+  paintPaperBackground(ctx, W, H);
+
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  // tiny top metadata row
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = `500 14px "Geist Mono", ui-monospace, monospace`;
+  letterSpacingSetter.letterSpacing = "4px";
+  ctx.fillText(`OZIEL SAUCEDA  ·  CATALOG`, 36, 36);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // large track number, top-left
+  ctx.fillStyle = INK_DARK;
+  ctx.font = `900 168px "Times New Roman", "Garamond", serif`;
+  ctx.fillText(String(trackIndex + 1).padStart(2, "0"), 32, 70);
+
+  // accent rule under the number
+  ctx.fillStyle = ACCENT_RED;
+  ctx.fillRect(36, 240, 86, 4);
+
+  // heading — heavy serif, all caps, dropped tracking
+  ctx.fillStyle = INK_DARK;
+  ctx.font = `700 56px "Times New Roman", "Georgia", serif`;
+  letterSpacingSetter.letterSpacing = "6px";
+  ctx.fillText(heading.toUpperCase(), 36, 268);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // tagline — italic serif
+  ctx.fillStyle = INK_MID;
+  ctx.font = `italic 24px "Georgia", "Times New Roman", serif`;
+  wrapText(ctx, tagline, 36, 348, W - 72, 30);
+
+  // side label bottom-right — vertical stamp feel
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = `500 13px "Geist Mono", ui-monospace, monospace`;
+  letterSpacingSetter.letterSpacing = "3px";
+  ctx.textAlign = "right";
+  ctx.fillText(sideLabel.toUpperCase(), W - 36, H - 36);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // tiny circle "live" mark next to side label
+  ctx.fillStyle = ACCENT_RED;
+  ctx.beginPath();
+  ctx.arc(W - 36 - ctx.measureText(sideLabel.toUpperCase()).width - 16, H - 30, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
+  return finalizeJCardTexture(canvas);
+}
+
+// MIDDLE PANEL — long-form body copy.
+export function createJCardCenterPanelTexture(
+  body: string,
+  heading: string,
+): THREE.CanvasTexture {
+  const W = JCARD_W;
+  const H = JCARD_H;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+  paintPaperBackground(ctx, W, H);
+
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+
+  // small section label
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = `500 13px "Geist Mono", ui-monospace, monospace`;
+  letterSpacingSetter.letterSpacing = "4px";
+  ctx.fillText(`// ${heading.toUpperCase()} — LINER NOTES`, 36, 36);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // accent rule
+  ctx.fillStyle = INK_DARK;
+  ctx.fillRect(36, 64, 64, 2);
+
+  // long-form body copy
+  ctx.fillStyle = INK_DARK;
+  ctx.font = `400 22px "Georgia", "Times New Roman", serif`;
+  wrapText(ctx, body, 36, 96, W - 72, 30);
+
+  // bottom watermark — small serif italic
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = `italic 14px "Georgia", serif`;
+  ctx.fillText(`— continued on the back panel.`, 36, H - 44);
+
+  ctx.textBaseline = "alphabetic";
+  return finalizeJCardTexture(canvas);
+}
+
+// RIGHT PANEL — credits / details list.
+export function createJCardRightPanelTexture(
+  credits: string[],
+  heading: string,
+  ownerName: string,
+): THREE.CanvasTexture {
+  const W = JCARD_W;
+  const H = JCARD_H;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+  paintPaperBackground(ctx, W, H);
+
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+
+  // section label
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = `500 13px "Geist Mono", ui-monospace, monospace`;
+  letterSpacingSetter.letterSpacing = "4px";
+  ctx.fillText(`// ${heading.toUpperCase()} — CREDITS`, 36, 36);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  ctx.fillStyle = INK_DARK;
+  ctx.fillRect(36, 64, 64, 2);
+
+  // bulleted credits list
+  ctx.fillStyle = INK_DARK;
+  ctx.font = `400 22px "Georgia", "Times New Roman", serif`;
+  const startY = 100;
+  credits.forEach((line, i) => {
+    const y = startY + i * 42;
+    // small square bullet
+    ctx.fillStyle = ACCENT_RED;
+    ctx.fillRect(36, y + 9, 6, 6);
+    ctx.fillStyle = INK_DARK;
+    ctx.fillText(line, 56, y);
+  });
+
+  // signature block bottom-right
+  ctx.fillStyle = INK_SOFT;
+  ctx.font = `italic 14px "Georgia", serif`;
+  ctx.textAlign = "right";
+  ctx.fillText("— with care,", W - 36, H - 84);
+  ctx.fillStyle = INK_DARK;
+  ctx.font = `italic 28px "Georgia", serif`;
+  ctx.fillText(ownerName, W - 36, H - 56);
+
+  // small stamp/seal in corner
+  ctx.save();
+  ctx.translate(60, H - 60);
+  ctx.rotate(-0.12);
+  ctx.strokeStyle = ACCENT_RED;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-32, -16, 64, 32);
+  ctx.fillStyle = ACCENT_RED;
+  ctx.font = `700 11px "Geist Mono", ui-monospace, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  letterSpacingSetter.letterSpacing = "2px";
+  ctx.fillText("ON FILE", 0, 0);
+  letterSpacingSetter.letterSpacing = "0px";
+  ctx.restore();
+
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+  return finalizeJCardTexture(canvas);
+}
+
+// shared word-wrap for the J-card panels. respects line breaks in the
+// source string and wraps long words at the panel width.
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+) {
+  const paragraphs = text.split("\n");
+  let cursorY = y;
+  for (const para of paragraphs) {
+    const words = para.split(" ");
+    let line = "";
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        ctx.fillText(line, x, cursorY);
+        cursorY += lineHeight;
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) {
+      ctx.fillText(line, x, cursorY);
+      cursorY += lineHeight;
+    }
+  }
+}
+
+function finalizeJCardTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
 }

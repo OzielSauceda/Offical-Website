@@ -16,6 +16,13 @@ export type Slab = {
   // type still validates the about cassettes that include it. unused by
   // the current cassette / CD-case / vinyl / laminate props.
   treatment?: SlabTreatment;
+  // optional richer content used when a slab can unfold into a larger
+  // J-card insert: a short tagline that sits under the heading, a longer
+  // body paragraph for the middle panel, and a bullet list of credits
+  // for the right panel.
+  tagline?: string;
+  detail?: string;
+  credits?: string[];
 };
 
 export type SectionContent = {
@@ -29,22 +36,49 @@ export const SECTION_CONTENT: Record<SectionId, SectionContent> = {
   about: {
     slabs: [
       {
-        heading: "ORIGIN",
-        body: "Built from a small town and a louder imagination. Software, design, and stage craft in equal measure.",
+        heading: "INTRODUCTION",
+        body: "Hello — this is me.",
         meta: "SIDE A · 2:34",
         treatment: "paper",
+        tagline: "A short note from the front of the stage.",
+        detail:
+          "I'm Oziel Sauceda — a developer who builds cinematic, performance-minded interfaces. I treat every site like a stage: composition, lighting, motion, restraint. Quietly opinionated about typography and the small details that decide whether a page feels designed or assembled.",
+        credits: [
+          "Based in Texas",
+          "Always sketching",
+          "Open to collaborate",
+          "Reachable via the contact set",
+        ],
       },
       {
-        heading: "FOCUS",
-        body: "Interfaces that move. Real-time graphics, careful typography, and product instincts borrowed from album rollouts.",
+        heading: "EDUCATION",
+        body: "Where the practice was forged.",
         meta: "SIDE A · 3:12",
         treatment: "black",
+        tagline: "Formal training, plus a stubborn obsession.",
+        detail:
+          "Computer Science fundamentals paired with a self-driven obsession with type, motion, and graphics programming. The classroom gave me the grammar; small projects, late-night experiments, and dissecting album rollouts gave me the voice.",
+        credits: [
+          "BS Computer Science",
+          "Self-taught design",
+          "Stage craft via tour studies",
+          "Daily reading & sketching",
+        ],
       },
       {
-        heading: "SIGNAL",
-        body: "Always sketching. Always shipping. The site you are inside of is the current draft of the answer.",
+        heading: "HOBBIES",
+        body: "Off-stage interests.",
         meta: "SIDE B · 1:48",
         treatment: "concrete",
+        tagline: "What I do when I'm not shipping.",
+        detail:
+          "Music — listening, dissecting, and rebuilding album rollouts in code. Photography at golden hour. Long walks. Building tiny tools nobody asked for. Anything that rewards patience and craft over speed.",
+        credits: [
+          "Album rollouts",
+          "Photography",
+          "Code as craft",
+          "Long walks at golden hour",
+        ],
       },
     ],
   },

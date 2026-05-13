@@ -14,7 +14,10 @@ type Props = {
   enteredCameraTarget: CameraTarget | null;
 };
 
-const DEFAULT_POS: [number, number, number] = [0, 1.72, 4.85];
+// pulled back from 4.85 → 5.75 so the full stage fits in frame with
+// breathing room top (ABOUT ring) and bottom (outer platform/ring),
+// without shrinking the stage or shifting it up.
+const DEFAULT_POS: [number, number, number] = [0, 1.72, 5.75];
 const DEFAULT_LOOK: [number, number, number] = [0, 1.52, 0];
 
 // gentle mouse parallax + a per-section entry pose. when a section is

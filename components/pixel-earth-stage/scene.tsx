@@ -7,6 +7,7 @@ import { Stars } from "@react-three/drei";
 import { SECTION_CAMERA_TARGETS } from "@/lib/section-camera-targets";
 import type { EnvironmentId, SectionId } from "@/lib/sections";
 
+import { BackgroundAtmosphere } from "./background-atmosphere";
 import { CameraRig } from "./camera-rig";
 import { ContactHouseStage } from "./contact-house-stage";
 import { Dome } from "./dome";
@@ -14,7 +15,6 @@ import { DomeLiftGroup } from "./dome-lift-group";
 import { DomeRimGlow } from "./dome-rim-glow";
 import { DomeSmoke } from "./dome-smoke";
 import { GlowRing } from "./glow-ring";
-import { PixelCharacter } from "./pixel-character";
 import { ResearchBridgeStage } from "./research-bridge-stage";
 import { ScreenAssembly } from "./screen-assembly";
 import { SectionRevealHost } from "./section-reveals/section-reveal-host";
@@ -36,6 +36,10 @@ type Props = {
 };
 
 const STAGE_Y = 0;
+// shrinks the whole stage stack (globe, smoke, beams, ring, character,
+// per-section reveals) uniformly so it fits the viewport with breathing
+// room top and bottom. lights are scaled to match below.
+const STAGE_SCALE = 1;
 
 export function Scene(props: Props) {
   const isGlobeEnvironment = props.environment === "globe";
@@ -60,18 +64,32 @@ export function Scene(props: Props) {
           target sits at world origin, so a source at (0, 5.2, 0) projects
           straight down. */}
       <spotLight
-        position={[0, 5.35, 0.08]}
+        position={[0, 5.35 * STAGE_SCALE, 0.08 * STAGE_SCALE]}
         angle={0.46}
         penumbra={0.82}
-        distance={10}
+        distance={10 * STAGE_SCALE}
         decay={1.08}
         intensity={9.2}
         color="#eaf2ff"
       />
       {/* warm rear fill — keeps the back of the dome from going flat black */}
-      <directionalLight position={[-2.6, 1.8, 2]} intensity={0.58} color="#f2d8a8" />
-      <pointLight position={[-2.8, 0.9, 1.6]} intensity={1.2} distance={5.5} color="#bfffdc" />
-      <pointLight position={[2.8, 0.9, 1.6]} intensity={1.0} distance={5.5} color="#a9c9ff" />
+      <directionalLight
+        position={[-2.6 * STAGE_SCALE, 1.8 * STAGE_SCALE, 2 * STAGE_SCALE]}
+        intensity={0.58}
+        color="#f2d8a8"
+      />
+      <pointLight
+        position={[-2.8 * STAGE_SCALE, 0.9 * STAGE_SCALE, 1.6 * STAGE_SCALE]}
+        intensity={1.2}
+        distance={5.5 * STAGE_SCALE}
+        color="#bfffdc"
+      />
+      <pointLight
+        position={[2.8 * STAGE_SCALE, 0.9 * STAGE_SCALE, 1.6 * STAGE_SCALE]}
+        intensity={1.0}
+        distance={5.5 * STAGE_SCALE}
+        color="#a9c9ff"
+      />
       <hemisphereLight args={["#8fa4d5", "#0c0a1c", 0.42]} />
 
       <CameraRig
@@ -79,14 +97,22 @@ export function Scene(props: Props) {
         enteredCameraTarget={enteredCameraTarget}
       />
 
+      {/* base background — far star fill + nebula clouds + drifting dust.
+          renders even in reduced-motion mode (the dust drift gates itself
+          inside the component) so the deep-space backdrop stays full. */}
+      <BackgroundAtmosphere reducedMotion={props.reducedMotion} />
+
       {!props.reducedMotion && (
         <>
-          <Stars radius={32} depth={22} count={900} factor={2.2} fade speed={0.35} />
+          <Stars radius={34} depth={26} count={650} factor={2} fade speed={0.65} />
           <ShootingStars />
         </>
       )}
 
-      <group position={[0, STAGE_Y, 0]}>
+      <group
+        position={[0, STAGE_Y, 0]}
+        scale={[STAGE_SCALE, STAGE_SCALE, STAGE_SCALE]}
+      >
         <DomeLiftGroup entered={isAboutEntered} reducedMotion={props.reducedMotion}>
           <Dome
             targetRotationRef={props.targetRotationRef}
@@ -101,7 +127,6 @@ export function Scene(props: Props) {
           />
           <DomeRimGlow isGlobeEnvironment={isGlobeEnvironment} />
           <DomeSmoke
-            targetRotationRef={props.targetRotationRef}
             reducedMotion={props.reducedMotion}
             isGlobeEnvironment={isGlobeEnvironment}
           />
@@ -122,10 +147,6 @@ export function Scene(props: Props) {
           enteredSectionId={props.enteredSectionId}
           reducedMotion={props.reducedMotion}
           ringRotationRef={props.contentRingRotationRef}
-        />
-        <PixelCharacter
-          reducedMotion={props.reducedMotion}
-          isGlobeEnvironment={isGlobeEnvironment}
         />
         <YeezusMountainStage
           targetRotationRef={props.targetRotationRef}

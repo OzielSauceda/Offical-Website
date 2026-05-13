@@ -13,9 +13,15 @@ const WHEEL_DECAY_MS = 100;
 const COOLDOWN_MS = 360;
 
 // rotates a ring of N content elements. snaps to N evenly-spaced stops on
-// release so one element is always centered toward the camera.
-export function useContentRingRotation(stops: number) {
-  const STEP_RAD = (Math.PI * 2) / stops;
+// release so one element is always centered toward the camera. by default
+// the stops span a full circle (2π/N step). passing a custom stepRad lets
+// callers use a smaller fan layout (e.g. 60°-apart cassettes in front of
+// the camera). rotation is clamped to ±((stops-1)/2 * step) so the user
+// can't swipe past the last stop in either direction.
+export function useContentRingRotation(stops: number, stepRad?: number) {
+  const STEP_RAD = stepRad ?? (Math.PI * 2) / stops;
+  const MAX_ROT = ((stops - 1) / 2) * STEP_RAD;
+  const clamp = (v: number) => Math.max(-MAX_ROT, Math.min(MAX_ROT, v));
   const targetRotationRef = useRef(0);
   const swipeStartRef = useRef<{ x: number; rotation: number } | null>(null);
   const cooldownUntilRef = useRef(0);
@@ -41,8 +47,10 @@ export function useContentRingRotation(stops: number) {
       const start = swipeStartRef.current;
       if (!start) return;
       const dx = e.clientX - start.x;
-      targetRotationRef.current = start.rotation + dx * DRAG_SENSITIVITY;
+      targetRotationRef.current = clamp(start.rotation + dx * DRAG_SENSITIVITY);
     },
+    // clamp is stable across renders (closure over MAX_ROT)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
@@ -52,14 +60,18 @@ export function useContentRingRotation(stops: number) {
     if (!start) return;
     const snapped =
       Math.round(targetRotationRef.current / STEP_RAD) * STEP_RAD;
-    targetRotationRef.current = snapped;
+    targetRotationRef.current = clamp(snapped);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [STEP_RAD]);
 
   const advance = useCallback(
     (dir: -1 | 1) => {
       cooldownUntilRef.current = performance.now() + COOLDOWN_MS;
-      targetRotationRef.current -= dir * STEP_RAD;
+      targetRotationRef.current = clamp(
+        targetRotationRef.current - dir * STEP_RAD,
+      );
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [STEP_RAD],
   );
 

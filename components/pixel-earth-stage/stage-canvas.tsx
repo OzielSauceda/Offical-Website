@@ -35,9 +35,12 @@ export function StageCanvas({
 }: Props) {
   return (
     <Canvas
-      camera={{ position: [0, 1.72, 4.85], fov: 64 }}
+      camera={{ position: [0, 1.72, 5.75], fov: 64 }}
       dpr={[1, 2]}
       gl={{ antialias: false, alpha: true, powerPreference: "high-performance" }}
+      onCreated={({ gl }) => {
+        gl.localClippingEnabled = true;
+      }}
     >
       <Scene
         targetRotationRef={targetRotationRef}
