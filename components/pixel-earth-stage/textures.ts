@@ -818,7 +818,7 @@ export function createCassetteFaceTexture(
 // stripe. shows the molded back of the cassette: horizontal top/bottom
 // seam bands, a thin vertical center seam, two reel spindle holes
 // (mirrored from the face), a small tape window in the middle, corner
-// screws + a center-bottom screw, small notches, a faint Dolby NR
+// screws + a center-bottom screw, small notches, a faint HI-FI STEREO
 // stamp, a "MADE IN U.S.A." mark, and the bottom transport slots.
 export function createCassetteBackTexture(
   seed: number,
@@ -946,13 +946,13 @@ export function createCassetteBackTexture(
   ctx.fillRect(112, 20, 16, 5);
   ctx.fillRect(W - 128, 20, 16, 5);
 
-  // faint Dolby NR stamp top-right
+  // faint hi-fi stamp top-right — generic, no Dolby trademark reference
   ctx.fillStyle = "rgba(40, 32, 24, 0.55)";
   ctx.font = `600 14px "Helvetica", "Arial", sans-serif`;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   letterSpacingSetter.letterSpacing = "2px";
-  ctx.fillText("DOLBY NR", W - 95, 92);
+  ctx.fillText("HI-FI STEREO", W - 95, 92);
   letterSpacingSetter.letterSpacing = "0px";
 
   // a small SIDE marker on the left for continuity with the face
@@ -994,7 +994,7 @@ export function createCassetteBackTexture(
 // front-of-case mold detail layer for the Projects CD prop. drawn on
 // transparent background — only the molded plastic features (corner
 // clips, edge bevel, latch grooves, raised slots, bubble screws, header
-// arrow, "80" stamp, MD logo) are visible. the disc and the lavender
+// arrow, "22" stamp, project mark) are visible. the disc and the lavender
 // sticker live on their own meshes so the side view shows a circular
 // disc inside a clear case instead of a square interior card.
 export function createCdCaseShellFaceTexture(
@@ -1112,48 +1112,42 @@ export function createCdCaseShellFaceTexture(
     ctx.fill();
   }
 
-  // header "INSERT THIS END ▼"
+  // header "LOAD PROJECT SIDE ▼"
   ctx.fillStyle = "#1a1614";
   ctx.font = `700 22px "Arial Narrow", "Helvetica", sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   letterSpacingSetter.letterSpacing = "2px";
   const headerY = 100;
-  ctx.fillText("INSERT THIS END", W / 2 + 30, headerY);
+  ctx.fillText("LOAD PROJECT SIDE", W / 2 + 30, headerY);
   letterSpacingSetter.letterSpacing = "0px";
   ctx.beginPath();
-  const triX = W / 2 - 100;
+  const triX = W / 2 - 130;
   ctx.moveTo(triX - 10, headerY - 8);
   ctx.lineTo(triX + 10, headerY - 8);
   ctx.lineTo(triX, headerY + 8);
   ctx.closePath();
   ctx.fill();
 
-  // "80" capacity stamp upper-right
+  // "22" capacity stamp upper-right
   ctx.font = `800 78px "Helvetica", "Arial", sans-serif`;
   ctx.fillStyle = "#1a1614";
   ctx.textAlign = "right";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("80", W - 90, 270);
+  ctx.fillText("22", W - 90, 270);
 
-  // MD logo bottom-center
-  const logoCX = W / 2;
-  const logoCY = H - 110;
-  const logoW = 70;
-  const logoH = 44;
-  ctx.fillStyle = "rgba(40, 40, 50, 0.92)";
-  ctx.fillRect(logoCX - logoW / 2, logoCY - logoH / 2, logoW, logoH);
-  ctx.fillStyle = "rgba(220, 226, 235, 0.98)";
-  ctx.font = `800 19px "Impact", "Arial Narrow Bold", sans-serif`;
-  ctx.textAlign = "left";
+  // generic project mark bottom-center — replaces the prior minidisc-
+  // style badge with original copy that doesn't reference Sony / MD.
+  ctx.fillStyle = "rgba(40, 40, 50, 0.78)";
+  ctx.font = `700 13px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("M", logoCX - logoW / 2 + 8, logoCY - 9);
-  ctx.fillText("D", logoCX - logoW / 2 + 8, logoCY + 11);
-  ctx.font = `400 9px "Arial Narrow", sans-serif`;
-  letterSpacingSetter.letterSpacing = "1px";
-  ctx.fillText("MINI", logoCX - logoW / 2 + 26, logoCY - 13);
-  ctx.fillText("DISC", logoCX - logoW / 2 + 26, logoCY - 1);
-  ctx.fillText("RECORDABLE", logoCX - logoW / 2 + 26, logoCY + 11);
+  letterSpacingSetter.letterSpacing = "4px";
+  ctx.fillText("PROJECT DISC", W / 2, H - 118);
+  ctx.font = `500 10px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.fillStyle = "rgba(40, 40, 50, 0.58)";
+  letterSpacingSetter.letterSpacing = "3px";
+  ctx.fillText("VOL. 02", W / 2, H - 100);
   letterSpacingSetter.letterSpacing = "0px";
 
   ctx.textAlign = "start";
@@ -1356,7 +1350,7 @@ export function createCdDiscTexture(
 
   // curved technical text on the left arc
   const techRadius = hubR + 48;
-  const techText = `RECORDABLE MD · PROJECT DISC · TRACK ${trackNumber} · `;
+  const techText = `PROJECT DISC · OZIEL SAUCEDA · TRACK ${trackNumber} · `;
   const arcCenter = Math.PI;
   const arcSpan = Math.PI * 0.95;
   ctx.save();
@@ -1380,7 +1374,7 @@ export function createCdDiscTexture(
   letterSpacingSetter.letterSpacing = "0px";
   ctx.restore();
 
-  // vertical "RECORDABLE MD" on the right
+  // vertical "PROJECT DISC" on the right — generic mark, no Sony/MD ref
   ctx.save();
   ctx.translate(discCX + discR * 0.74, discCY + discR * 0.25);
   ctx.rotate(-Math.PI / 2);
@@ -1389,7 +1383,7 @@ export function createCdDiscTexture(
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   letterSpacingSetter.letterSpacing = "2px";
-  ctx.fillText("RECORDABLE MD", 0, 0);
+  ctx.fillText("PROJECT DISC", 0, 0);
   letterSpacingSetter.letterSpacing = "0px";
   ctx.restore();
 
