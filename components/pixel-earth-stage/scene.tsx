@@ -4,7 +4,10 @@ import { RefObject } from "react";
 
 import { Stars } from "@react-three/drei";
 
-import { SECTION_CAMERA_TARGETS } from "@/lib/section-camera-targets";
+import {
+  ABOUT_READING_CAMERA,
+  SECTION_CAMERA_TARGETS,
+} from "@/lib/section-camera-targets";
 import type { EnvironmentId, SectionId } from "@/lib/sections";
 
 import { BackgroundAtmosphere } from "./background-atmosphere";
@@ -15,12 +18,13 @@ import { DomeLiftGroup } from "./dome-lift-group";
 import { DomeRimGlow } from "./dome-rim-glow";
 import { DomeSmoke } from "./dome-smoke";
 import { GlowRing } from "./glow-ring";
+import type { JCardScreenRect } from "./jcard-page";
+import { MonolithMountainStage } from "./monolith-mountain-stage";
 import { ResearchBridgeStage } from "./research-bridge-stage";
 import { ScreenAssembly } from "./screen-assembly";
 import { SectionRevealHost } from "./section-reveals/section-reveal-host";
 import { ShootingStars } from "./shooting-stars";
 import { StageBeams } from "./stage-beams";
-import { MonolithMountainStage } from "./monolith-mountain-stage";
 
 type Props = {
   targetRotationRef: RefObject<number>;
@@ -33,6 +37,13 @@ type Props = {
   enteredHeader: string;
   enteredSubhead: string;
   contentRingRotationRef: RefObject<number>;
+  aboutReadModeActive: boolean;
+  aboutPageActive: boolean;
+  paperProgressRef?: RefObject<number>;
+  jcardScreenRectRef?: RefObject<JCardScreenRect | null>;
+  onAboutSelectionChange?: (index: number | null) => void;
+  onAboutPageCloseRequest?: () => void;
+  onReadingCameraSettled?: (settled: boolean) => void;
 };
 
 const STAGE_Y = 0;
@@ -48,9 +59,11 @@ export function Scene(props: Props) {
   const isContactEnvironment = props.environment === "contact-house";
   const isAboutEntered = props.enteredSectionId === "about";
   const isEntered = props.enteredSectionId !== null;
-  const enteredCameraTarget = props.enteredSectionId
-    ? SECTION_CAMERA_TARGETS[props.enteredSectionId]
-    : null;
+  const enteredCameraTarget = props.aboutReadModeActive
+    ? ABOUT_READING_CAMERA
+    : props.enteredSectionId
+      ? SECTION_CAMERA_TARGETS[props.enteredSectionId]
+      : null;
 
   return (
     <>
@@ -95,6 +108,8 @@ export function Scene(props: Props) {
       <CameraRig
         reducedMotion={props.reducedMotion}
         enteredCameraTarget={enteredCameraTarget}
+        readingCameraActive={props.aboutReadModeActive}
+        onReadingCameraSettled={props.onReadingCameraSettled}
       />
 
       {/* base background — far star fill + nebula clouds + drifting dust.
@@ -147,6 +162,11 @@ export function Scene(props: Props) {
           enteredSectionId={props.enteredSectionId}
           reducedMotion={props.reducedMotion}
           ringRotationRef={props.contentRingRotationRef}
+          aboutPageActive={props.aboutPageActive}
+          paperProgressRef={props.paperProgressRef}
+          jcardScreenRectRef={props.jcardScreenRectRef}
+          onAboutSelectionChange={props.onAboutSelectionChange}
+          onAboutPageCloseRequest={props.onAboutPageCloseRequest}
         />
         <MonolithMountainStage
           targetRotationRef={props.targetRotationRef}

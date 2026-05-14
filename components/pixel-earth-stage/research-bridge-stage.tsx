@@ -6,7 +6,7 @@
 // cables extending up out of frame, and a painterly cloud backdrop behind it.
 // two small silhouette figures stand inside.
 
-/* eslint-disable react-hooks/immutability */
+ 
 
 import { RefObject, useEffect, useMemo, useRef } from "react";
 

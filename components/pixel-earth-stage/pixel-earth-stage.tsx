@@ -16,10 +16,12 @@ import { useContentRingRotation } from "@/lib/hooks/use-content-ring-rotation";
 import { useEnteredSection } from "@/lib/hooks/use-entered-section";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useSectionNavigator } from "@/lib/hooks/use-section-navigator";
+import { SECTION_CONTENT } from "@/lib/section-content";
 import { SECTIONS } from "@/lib/sections";
 
 import { EnterChip } from "./enter-chip";
 import { IntroLoader } from "./intro-loader";
+import { JCardPage, type JCardScreenRect } from "./jcard-page";
 
 const StageCanvas = dynamic(
   () => import("./stage-canvas").then((m) => m.StageCanvas),
@@ -37,6 +39,7 @@ const StageCanvas = dynamic(
 const SETTLE_TOLERANCE = 0.04;
 
 export function PixelEarthStage() {
+  const sectionRef = useRef<HTMLElement>(null);
   const [grabbing, setGrabbing] = useState(false);
   const targetRotationRef = useRef(-0.55);
   const isDraggingRef = useRef(false);
@@ -55,6 +58,189 @@ export function PixelEarthStage() {
   } = useSectionNavigator();
 
   const { enteredSectionId, enter, exit } = useEnteredSection();
+
+  // selected About cassette (lifted from the reveal). drives the read-mode
+  // camera dolly + the J-card print layer. `null` while the cassette ring is
+  // idle or no cassette has been clicked yet.
+  const [aboutSelectedIndex, setAboutSelectedIndex] = useState<number | null>(
+    null,
+  );
+  // becomes true a beat after a cassette is selected (lid has had time to
+  // swing open) so the print layer + camera push-in only kick in once the open
+  // animation has settled. instant under reduced motion.
+  const [aboutReadReady, setAboutReadReady] = useState(false);
+  // any time an About cassette is selected (opening, open, closing) we want
+  // pointer/wheel routed away from the carousels so the user can't yank the
+  // ring while a cassette is mid-animation. read-mode waits for the open
+  // animation to settle.
+  const aboutCassetteOpen =
+    enteredSectionId === "about" && aboutSelectedIndex !== null;
+  const aboutReadModeActive = aboutCassetteOpen && aboutReadReady;
+
+  // delay reading-mode readiness so the lid open + cassette focus animation
+  // can play first. reset and re-time whenever the selected cassette
+  // changes; clear immediately on deselect. these setStates are exactly the
+  // "sync local state to an external trigger" use effects exist for.
+  useEffect(() => {
+    if (aboutSelectedIndex === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAboutReadReady(false);
+      return;
+    }
+    if (reducedMotion) {
+      setAboutReadReady(true);
+      return;
+    }
+    setAboutReadReady(false);
+    const id = window.setTimeout(() => setAboutReadReady(true), 1050);
+    return () => window.clearTimeout(id);
+  }, [aboutSelectedIndex, reducedMotion]);
+
+  // viewport-percent rect the J-card paper occupies on screen. updated every
+  // frame by the AboutCassette projection so it tracks the paper through
+  // the camera dolly AND the extract+flip motion. snapshotted into state
+  // at the instant extraction completes so JCardPage's morph starts from
+  // the paper's actual presented pose — the user reads the rect grow as
+  // a continuation of the physical paper, not a separate page swap.
+  const jcardScreenRectRef = useRef<JCardScreenRect | null>(null);
+  const [jcardStartRect, setJcardStartRect] = useState<JCardScreenRect | null>(
+    null,
+  );
+
+  // reading-mode camera has dollied to its close pose. armed by the camera
+  // rig once distance to ABOUT_READING_CAMERA crosses a tight threshold.
+  const [cameraReadingSettled, setCameraReadingSettled] = useState(false);
+
+  // paper-extract phase: 0 = paper at rest inside the case, 1 = paper has
+  // slid forward of the case and rotated from portrait to landscape, ready
+  // to hand off to the DOM page. rAF-driven, read inside the canvas via
+  // paperProgressRef.current. the boolean mirror paperExtracted lets
+  // React-side state (page mount) react to the animation finishing without
+  // re-rendering every frame.
+  const paperProgressRef = useRef(0);
+  const [paperExtracted, setPaperExtracted] = useState(false);
+
+  // closingPage gates the cassette close so page-exit and paper-retract
+  // play in sequence before the lid swings shut.
+  const [closingPage, setClosingPage] = useState(false);
+
+  const handleReadingCameraSettled = useCallback((settled: boolean) => {
+    setCameraReadingSettled(settled);
+  }, []);
+
+  // when the camera arrives, animate the paper out of the case and rotate
+  // it from portrait to landscape. one progress value, split into
+  // overlapping slide/rotate phases inside AboutCassette so the motion
+  // reads as a single continuous pull-out + flip.
+  useEffect(() => {
+    if (closingPage) return;
+    if (!cameraReadingSettled) {
+      paperProgressRef.current = 0;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPaperExtracted(false);
+      return;
+    }
+    if (reducedMotion) {
+      paperProgressRef.current = 1;
+      setPaperExtracted(true);
+      return;
+    }
+    let raf = 0;
+    const start = performance.now();
+    const startVal = paperProgressRef.current;
+    const duration = 1000 * Math.max(0.05, 1 - startVal);
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      // cubic-in-out: gentle takeoff, smooth landing, no jerky ends.
+      const eased =
+        t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      paperProgressRef.current = startVal + (1 - startVal) * eased;
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        paperProgressRef.current = 1;
+        setPaperExtracted(true);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cameraReadingSettled, closingPage, reducedMotion]);
+
+  // snapshot the paper's screen rect the instant extraction finishes, so
+  // JCardPage's morph starts from the just-flipped landscape paper.
+  useEffect(() => {
+    if (paperExtracted) {
+      setJcardStartRect(jcardScreenRectRef.current);
+    } else {
+      setJcardStartRect(null);
+    }
+  }, [paperExtracted]);
+
+  const aboutPageActive = paperExtracted && !closingPage;
+
+  // close orchestration. Escape → closingPage true → JCardPage exit shrinks
+  // back to paper rect (520ms). then paper retracts (700ms): rotates back
+  // to portrait, slides back into the case. then setAboutSelectedIndex(null)
+  // → cassette lid swings shut via the existing open/close logic.
+  const initiatePageClose = useCallback(() => {
+    if (!aboutPageActive && !closingPage) {
+      setAboutSelectedIndex(null);
+      return;
+    }
+    if (closingPage) return;
+    setClosingPage(true);
+  }, [aboutPageActive, closingPage]);
+
+  useEffect(() => {
+    if (!closingPage) return;
+    const pageExit = reducedMotion ? 0 : 520;
+    const paperRetract = reducedMotion ? 0 : 700;
+
+    let raf = 0;
+    let pageTimer = 0;
+    let cassetteTimer = 0;
+
+    pageTimer = window.setTimeout(() => {
+      if (reducedMotion) {
+        paperProgressRef.current = 0;
+      } else {
+        const start = performance.now();
+        const startVal = paperProgressRef.current;
+        const tick = (now: number) => {
+          const t = Math.min(1, (now - start) / paperRetract);
+          const eased =
+            t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          paperProgressRef.current = startVal * (1 - eased);
+          if (t < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      }
+      cassetteTimer = window.setTimeout(() => {
+        paperProgressRef.current = 0;
+        setAboutSelectedIndex(null);
+        setClosingPage(false);
+      }, paperRetract);
+    }, pageExit);
+
+    return () => {
+      window.clearTimeout(pageTimer);
+      window.clearTimeout(cassetteTimer);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [closingPage, reducedMotion]);
+
+  // when the cassette closes, focus was probably inside the J-card reader
+  // (now hidden) or the 3D liner-note column (now unmounted). put focus
+  // back on the stage section so a follow-up Escape can still exit About.
+  useEffect(() => {
+    if (aboutSelectedIndex !== null) return;
+    const section = sectionRef.current;
+    if (!section) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || section.contains(active)) {
+      section.focus({ preventScroll: true });
+    }
+  }, [aboutSelectedIndex]);
 
   // content-ring rotation: 3 stops for now (About has 3 slabs). when the
   // first non-About reveal lands with a different slab count, we can lift
@@ -91,7 +277,7 @@ export function PixelEarthStage() {
   // section reveal (cassettes etc.) don't kick off a globe spin.
   const onGlobePointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
-      if (enteredSectionId !== null) return;
+      if (enteredSectionId !== null || aboutReadModeActive) return;
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -102,7 +288,7 @@ export function PixelEarthStage() {
       lastInteractionRef.current = performance.now();
       setGrabbing(true);
     },
-    [enteredSectionId],
+    [enteredSectionId, aboutReadModeActive],
   );
 
   const onGlobePointerMove = useCallback((e: PointerEvent<HTMLDivElement>) => {
@@ -124,21 +310,32 @@ export function PixelEarthStage() {
     setGrabbing(false);
   }, []);
 
-  const onEnvironmentWheel = useCallback((e: WheelEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    const primaryDelta =
-      Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    targetRotationRef.current += primaryDelta * 0.0022;
-    lastInteractionRef.current = performance.now();
-  }, []);
+  const onEnvironmentWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      // when the J-card reader is up, wheel events inside it stop
+      // propagation before they reach here. anything that does bubble up is
+      // outside the reader, but we still want the globe spin to freeze
+      // while reading, so bail out.
+      if (aboutCassetteOpen) return;
+      e.preventDefault();
+      const primaryDelta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      targetRotationRef.current += primaryDelta * 0.0022;
+      lastInteractionRef.current = performance.now();
+    },
+    [aboutCassetteOpen],
+  );
 
   // SCREEN zone — drives the screen carousel rotation OR the content ring,
-  // depending on whether a section is currently entered.
+  // depending on whether a section is currently entered. fully inert while
+  // the J-card reader is up so swipes inside the readable area don't
+  // accidentally rotate the cassette ring underneath.
   const screenZoneActive = enteredSectionId === null;
 
   const onScreenPointerDown = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       e.stopPropagation();
+      if (aboutCassetteOpen) return;
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -147,21 +344,23 @@ export function PixelEarthStage() {
       if (screenZoneActive) onPointerSwipeStart(e);
       else contentRing.onPointerSwipeStart(e);
     },
-    [screenZoneActive, onPointerSwipeStart, contentRing],
+    [aboutCassetteOpen, screenZoneActive, onPointerSwipeStart, contentRing],
   );
 
   const onScreenPointerMove = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       e.stopPropagation();
+      if (aboutCassetteOpen) return;
       if (screenZoneActive) onPointerSwipeMove(e);
       else contentRing.onPointerSwipeMove(e);
     },
-    [screenZoneActive, onPointerSwipeMove, contentRing],
+    [aboutCassetteOpen, screenZoneActive, onPointerSwipeMove, contentRing],
   );
 
   const onScreenPointerUp = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
       e.stopPropagation();
+      if (aboutCassetteOpen) return;
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
@@ -170,17 +369,18 @@ export function PixelEarthStage() {
       if (screenZoneActive) onPointerSwipeEnd();
       else contentRing.onPointerSwipeEnd();
     },
-    [screenZoneActive, onPointerSwipeEnd, contentRing],
+    [aboutCassetteOpen, screenZoneActive, onPointerSwipeEnd, contentRing],
   );
 
   const onScreenWheel = useCallback(
     (e: WheelEvent<HTMLDivElement>) => {
-      e.preventDefault();
       e.stopPropagation();
+      if (aboutCassetteOpen) return;
+      e.preventDefault();
       if (screenZoneActive) onWheel(e);
       else contentRing.onWheel(e);
     },
-    [screenZoneActive, onWheel, contentRing],
+    [aboutCassetteOpen, screenZoneActive, onWheel, contentRing],
   );
 
   const onKeyDown = useCallback(
@@ -233,6 +433,7 @@ export function PixelEarthStage() {
 
   return (
     <section
+      ref={sectionRef}
       aria-label={`Interactive pixel earth stage, ${sectionTitle} section`}
       tabIndex={0}
       className={`stage-shell relative h-[100svh] w-full overflow-hidden select-none touch-none outline-none ${grabbing ? "stage-cursor-grabbing" : "stage-cursor-grab"}`}
@@ -257,6 +458,13 @@ export function PixelEarthStage() {
         enteredHeader={enteredHeader}
         enteredSubhead={enteredSubhead}
         contentRingRotationRef={contentRing.targetRotationRef}
+        aboutReadModeActive={aboutReadModeActive}
+        aboutPageActive={aboutPageActive}
+        paperProgressRef={paperProgressRef}
+        jcardScreenRectRef={jcardScreenRectRef}
+        onAboutSelectionChange={setAboutSelectedIndex}
+        onAboutPageCloseRequest={initiatePageClose}
+        onReadingCameraSettled={handleReadingCameraSettled}
       />
 
       {/* SCREEN INTERACTION ZONE — invisible, captures pointer + wheel for
@@ -269,7 +477,7 @@ export function PixelEarthStage() {
             : "Section navigator: drag the circular screen to rotate between sections"
         }
         role="region"
-        className="absolute inset-x-0 top-0 h-[36%] cursor-ew-resize"
+        className={`absolute inset-x-0 top-0 h-[36%] cursor-ew-resize ${aboutCassetteOpen ? "pointer-events-none" : ""}`}
         onPointerDown={onScreenPointerDown}
         onPointerMove={onScreenPointerMove}
         onPointerUp={onScreenPointerUp}
@@ -287,7 +495,8 @@ export function PixelEarthStage() {
       />
 
       {/* EXIT affordance — only visible while entered. positioned bottom-left
-          out of the way of the slab ring. */}
+          out of the way of the slab ring. z-40 so it floats above the
+          full-viewport J-card reader (z-30). */}
       {enteredSectionId !== null && (
         <button
           type="button"
@@ -297,13 +506,30 @@ export function PixelEarthStage() {
           }}
           onClick={(e) => e.stopPropagation()}
           aria-label="End set and return to navigator"
-          className="pointer-events-auto absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border border-white/30 bg-black/40 px-3 py-1.5 text-[10px] uppercase tracking-[0.34em] text-white/85 backdrop-blur-sm transition-colors hover:border-white/70 hover:bg-black/60 focus-visible:border-white focus-visible:outline-none"
+          className={`pointer-events-auto absolute left-5 top-5 z-40 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] uppercase tracking-[0.34em] backdrop-blur-sm transition-colors focus-visible:outline-none ${
+            aboutPageActive
+              ? "border-[#a8895a]/60 bg-[#f3e8d0]/85 text-[#5a4520] hover:border-[#7a5b1e] hover:bg-[#f3e8d0] focus-visible:border-[#5a4520]"
+              : "border-white/30 bg-black/40 text-white/85 hover:border-white/70 hover:bg-black/60 focus-visible:border-white"
+          }`}
         >
           <span aria-hidden>←</span>
           <span>END SET</span>
           <span aria-hidden className="text-[9px] opacity-60">ESC</span>
         </button>
       )}
+
+      <JCardPage
+        visible={aboutPageActive}
+        reducedMotion={reducedMotion}
+        slab={
+          aboutSelectedIndex !== null
+            ? (SECTION_CONTENT.about.slabs[aboutSelectedIndex] ?? null)
+            : null
+        }
+        trackIndex={aboutSelectedIndex}
+        startRect={jcardStartRect}
+        onClose={initiatePageClose}
+      />
 
       <div aria-hidden className="stage-audience pointer-events-none absolute inset-0" />
       <div aria-hidden className="stage-grain pointer-events-none absolute inset-0" />

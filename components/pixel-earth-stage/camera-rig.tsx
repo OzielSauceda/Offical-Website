@@ -12,7 +12,14 @@ import type { CameraTarget } from "@/lib/section-camera-targets";
 type Props = {
   reducedMotion: boolean;
   enteredCameraTarget: CameraTarget | null;
+  readingCameraActive?: boolean;
+  onReadingCameraSettled?: (settled: boolean) => void;
 };
+
+// distance from camera to target at which the reading dolly is considered
+// arrived. picked small enough that the J-card has effectively grown to
+// fill the frame, but large enough that the lerp doesn't asymptote forever.
+const READING_SETTLE_DISTANCE = 0.12;
 
 // pulled back from 4.85 → 5.75 so the full stage fits in frame with
 // breathing room top (ABOUT ring) and bottom (outer platform/ring),
@@ -23,10 +30,25 @@ const DEFAULT_LOOK: [number, number, number] = [0, 1.52, 0];
 // gentle mouse parallax + a per-section entry pose. when a section is
 // "entered", the camera lerps from its parallax-driven default toward the
 // section's target position + lookAt; on exit it lerps back.
-export function CameraRig({ reducedMotion, enteredCameraTarget }: Props) {
+export function CameraRig({
+  reducedMotion,
+  enteredCameraTarget,
+  readingCameraActive,
+  onReadingCameraSettled,
+}: Props) {
   const { camera } = useThree();
   const target = useRef({ x: 0, y: 0 });
   const curLook = useRef<[number, number, number]>([...DEFAULT_LOOK]);
+  const settledRef = useRef(false);
+
+  // when reading mode exits, clear the latched-settled state so the next
+  // entry can re-fire the callback once the camera arrives again.
+  useEffect(() => {
+    if (!readingCameraActive && settledRef.current) {
+      settledRef.current = false;
+      onReadingCameraSettled?.(false);
+    }
+  }, [readingCameraActive, onReadingCameraSettled]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -63,7 +85,7 @@ export function CameraRig({ reducedMotion, enteredCameraTarget }: Props) {
     const ck = enteredCameraTarget
       ? reducedMotion
         ? 1
-        : Math.min(1, delta * 2.4)
+        : Math.min(1, delta * (enteredCameraTarget.transitionRate ?? 2.4))
       : k;
 
     camera.position.x += (dpx - camera.position.x) * ck;
@@ -74,6 +96,26 @@ export function CameraRig({ reducedMotion, enteredCameraTarget }: Props) {
     curLook.current[1] += (dly - curLook.current[1]) * ck;
     curLook.current[2] += (dlz - curLook.current[2]) * ck;
     camera.lookAt(curLook.current[0], curLook.current[1], curLook.current[2]);
+
+    // fire the reading-camera settle callback the first frame the camera
+    // arrives near its target. latched until reading mode exits — handled
+    // by the effect above. this is what hands off the in-cassette J-card
+    // to the full-viewport DOM page, so it must come from real proximity,
+    // not a timer.
+    if (
+      readingCameraActive &&
+      enteredCameraTarget &&
+      !settledRef.current
+    ) {
+      const ex = enteredCameraTarget.position[0] - camera.position.x;
+      const ey = enteredCameraTarget.position[1] - camera.position.y;
+      const ez = enteredCameraTarget.position[2] - camera.position.z;
+      const dist = Math.sqrt(ex * ex + ey * ey + ez * ez);
+      if (reducedMotion || dist < READING_SETTLE_DISTANCE) {
+        settledRef.current = true;
+        onReadingCameraSettled?.(true);
+      }
+    }
   });
 
   return null;

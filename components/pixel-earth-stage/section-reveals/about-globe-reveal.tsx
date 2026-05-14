@@ -2,12 +2,14 @@
 
 import { RefObject, useEffect, useMemo, useRef, useState } from "react";
 
-import { ThreeEvent, useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
+import { ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
 import { SECTION_CONTENT, type Slab } from "@/lib/section-content";
 import { SECTION_PALETTE } from "@/lib/section-palette";
 
+import type { JCardScreenRect } from "../jcard-page";
 import {
   createCassetteBackTexture,
   createCassetteFaceTexture,
@@ -15,6 +17,16 @@ import {
   createJCardLeftPanelTexture,
   createJCardRightPanelTexture,
 } from "../textures";
+
+// shared scratch vectors for projecting the J-card paper corners to NDC each
+// frame. only one cassette is ever the "open" one, so sharing across the
+// three instances is safe.
+const PAPER_PROJECT_CORNERS = [
+  new THREE.Vector3(),
+  new THREE.Vector3(),
+  new THREE.Vector3(),
+  new THREE.Vector3(),
+];
 
 const RING_RADIUS = 1.85;
 // bumped up so the labels read cleanly without the user having to lean in.
@@ -58,6 +70,12 @@ const OPEN_LID_ANGLE = -1.83;
 // closing sequence: lid → 0 first, then focus back to 0.
 const FOCUS_SETTLE = 0.95;
 const LID_DONE = 0.05;
+// Drei <Html> in transform mode renders at world-scale; these factors scale
+// the readable text DOM down so it fits the in-cassette J-card paper at the
+// three breakpoints.
+const J_CARD_HTML_SCALE_DESKTOP = 0.085;
+const J_CARD_HTML_SCALE_TABLET = 0.072;
+const J_CARD_HTML_SCALE_MOBILE = 0.052;
 
 // three cassettes at chest height arranged in a fan around the character
 const CASSETTE_ANGLES = [-Math.PI / 3, 0, Math.PI / 3];
@@ -235,7 +253,19 @@ type Props = {
   entered: boolean;
   reducedMotion: boolean;
   ringRotationRef: RefObject<number>;
+  aboutPageActive?: boolean;
+  paperProgressRef?: RefObject<number>;
+  jcardScreenRectRef?: RefObject<JCardScreenRect | null>;
+  onSelectionChange?: (index: number | null) => void;
+  onPageCloseRequest?: () => void;
 };
+
+// how far forward (cassette-local +Z) the J-card paper extracts from the
+// back of the case at full progress. paired with the camera at z=3.6 this
+// lands the rotated landscape paper at ~70% wide × 77% tall on screen —
+// clearly out of the case but with margin against the viewport for the
+// DOM page morph that follows.
+const PAPER_EXTRACT_Z = 0.5;
 
 const PALETTE = SECTION_PALETTE.about;
 
@@ -273,6 +303,14 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
+// hermite smoothstep — zero derivative at both ends. lets us split a single
+// 0..1 progress into overlapping slide / rotate phases without snapping.
+function smoothstep(edge0: number, edge1: number, x: number) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+
 function AboutCassette({
   slab,
   angle,
@@ -284,6 +322,9 @@ function AboutCassette({
   trackIndex,
   isOpen,
   isAnotherOpen,
+  pageActive,
+  paperProgressRef,
+  jcardScreenRectRef,
   onSelect,
 }: {
   slab: Slab;
@@ -296,6 +337,9 @@ function AboutCassette({
   trackIndex: number;
   isOpen: boolean;
   isAnotherOpen: boolean;
+  pageActive: boolean;
+  paperProgressRef?: RefObject<number>;
+  jcardScreenRectRef?: RefObject<JCardScreenRect | null>;
   onSelect: () => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -313,13 +357,45 @@ function AboutCassette({
   const shellMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const faceMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const rimMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const paperGroupRef = useRef<THREE.Group>(null);
+  const paperMeshRef = useRef<THREE.Mesh>(null);
+  const canvasWidth = useThree((state) => state.size.width);
+  const camera = useThree((state) => state.camera);
 
   const openRef = useRef(0);
   const lidOpenRef = useRef(0);
   const hideRef = useRef(0);
   const hoverRef = useRef(0);
+  // tracks whether the 3D paper should be fading toward invisible — flipped
+  // by pageActive once the DOM JCardPage has taken over the visual space.
+  const paperFadeRef = useRef(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  // readReady waits for the lid swing to settle before we show the
+  // printed paper preview. The full readable text waits for the DOM page,
+  // so the user never sees it snap from cassette space into page space.
+  const [readReady, setReadReady] = useState(false);
+  useEffect(() => {
+    if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setReadReady(false);
+      return;
+    }
+    if (reducedMotion) {
+      setReadReady(true);
+      return;
+    }
+    setReadReady(false);
+    const id = window.setTimeout(() => setReadReady(true), 1050);
+    return () => window.clearTimeout(id);
+  }, [isOpen, reducedMotion]);
 
   const trackNumber = String(trackIndex + 1).padStart(2, "0");
+  const jCardHtmlScale =
+    canvasWidth < 520
+      ? J_CARD_HTML_SCALE_MOBILE
+      : canvasWidth < 900
+        ? J_CARD_HTML_SCALE_TABLET
+        : J_CARD_HTML_SCALE_DESKTOP;
 
   const faceTexture = useMemo(
     () =>
@@ -437,7 +513,13 @@ function AboutCassette({
         (CASSETTE_REST_Y - CASSETTE_HIDDEN_Y) * localDescent;
     }
     g.position.y = y;
-    g.visible = true;
+    // hide the whole cassette group when About isn't entered AND the exit
+    // ramp has fully run down. invisible Three groups are also non-
+    // raycastable, so this prevents the preloaded cassette meshes from
+    // catching pointer events while the user is on Research / Projects /
+    // Contact / the default carousel state. the small floor on raw keeps
+    // the group visible during the exit animation itself.
+    g.visible = entered || raw > 0.002;
 
     // SEQUENCED OPEN / CLOSE
     //
@@ -514,10 +596,32 @@ function AboutCassette({
     if (lid) {
       lid.rotation.x = lidOpenRef.current * OPEN_LID_ANGLE;
     }
-    // J-card paper insert fades in with the lid open progress, so the
-    // cassette face stays visible through the closed lid plastic.
+    // PAPER EXTRACT + FLIP
+    //
+    // paperProgressRef is driven 0 → 1 by pixel-earth-stage when the camera
+    // settles, and 1 → 0 in reverse during page close. one progress value,
+    // split here into overlapping phases so the motion reads as one
+    // continuous pull-out + rotate rather than two stacked animations:
+    //   slide:  pp 0.00 → 0.55 (paper clears the case lip first)
+    //   rotate: pp 0.40 → 1.00 (rotation overlaps the tail of the slide)
+    // smoothstep zeroes the derivative at both ends so the slide doesn't
+    // yank out at frame 1 and the rotation lands without snapping.
+    const paperGroup = paperGroupRef.current;
+    const pp = isOpen ? (paperProgressRef?.current ?? 0) : 0;
+    if (paperGroup) {
+      const slidePp = smoothstep(0, 0.55, pp);
+      const rotatePp = smoothstep(0.4, 1, pp);
+      paperGroup.position.z = -CASE_D / 2 + 0.007 + PAPER_EXTRACT_Z * slidePp;
+      paperGroup.rotation.z = -((Math.PI / 2) * rotatePp);
+    }
+    // when the DOM page takes over, fade the 3D paper out so we don't see
+    // the cream mesh sitting underneath the morphing page.
+    const paperFadeTarget = pageActive ? 1 : 0;
+    const fk = reducedMotion ? 1 : Math.min(1, delta * 4);
+    paperFadeRef.current += (paperFadeTarget - paperFadeRef.current) * fk;
     if (jcardInsertMatRef.current) {
-      jcardInsertMatRef.current.opacity = lidOpenRef.current;
+      const base = Math.max(lidOpenRef.current, pp);
+      jcardInsertMatRef.current.opacity = base * (1 - paperFadeRef.current);
     }
 
     // J-card stays closed — its content reveal comes in a later step.
@@ -529,15 +633,66 @@ function AboutCassette({
         mat.opacity = 0;
       }
     }
+
+    // project the paper plane corners to viewport-percent so the DOM page
+    // can morph out of the J-card rect rather than crossfading on top. only
+    // the currently-open cassette writes — the others sit idle.
+    if (isOpen && jcardScreenRectRef && paperMeshRef.current) {
+      const paper = paperMeshRef.current;
+      paper.updateWorldMatrix(true, false);
+      const geo = paper.geometry as THREE.PlaneGeometry;
+      const pw = geo.parameters.width;
+      const ph = geo.parameters.height;
+      PAPER_PROJECT_CORNERS[0]!.set(-pw / 2, -ph / 2, 0);
+      PAPER_PROJECT_CORNERS[1]!.set(pw / 2, -ph / 2, 0);
+      PAPER_PROJECT_CORNERS[2]!.set(pw / 2, ph / 2, 0);
+      PAPER_PROJECT_CORNERS[3]!.set(-pw / 2, ph / 2, 0);
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < 4; i++) {
+        const v = PAPER_PROJECT_CORNERS[i]!;
+        v.applyMatrix4(paper.matrixWorld).project(camera);
+        const sx = v.x * 0.5 + 0.5;
+        const sy = -v.y * 0.5 + 0.5;
+        if (sx < minX) minX = sx;
+        if (sx > maxX) maxX = sx;
+        if (sy < minY) minY = sy;
+        if (sy > maxY) maxY = sy;
+      }
+      // clamp to viewport so a paper sitting partially off-screen during
+      // an animation can't produce a wildly out-of-range starting rect.
+      minX = Math.max(0, Math.min(1, minX));
+      maxX = Math.max(0, Math.min(1, maxX));
+      minY = Math.max(0, Math.min(1, minY));
+      maxY = Math.max(0, Math.min(1, maxY));
+      jcardScreenRectRef.current = {
+        left: minX * 100,
+        top: minY * 100,
+        width: (maxX - minX) * 100,
+        height: (maxY - minY) * 100,
+      };
+    }
   });
 
   const handleClick = (e: ThreeEvent<PointerEvent>) => {
+    // hard safety guard: even if a stray raycast catches a hidden mesh, we
+    // refuse to select when the section isn't entered or the cassette
+    // hasn't risen close to its rest pose yet.
+    if (!entered || entryProgressRef.current < 0.85) return;
     e.stopPropagation();
     if (e.nativeEvent && "stopPropagation" in e.nativeEvent) {
       e.nativeEvent.stopPropagation();
     }
     onSelect();
   };
+
+  // pointer handlers are only wired up when About is actually entered. this
+  // is the primary defense — with no handlers attached, the meshes act as
+  // pure background props from any other section's perspective, even if
+  // raycasting somehow reaches them.
+  const interactive = entered && !isAnotherOpen;
 
   return (
     <group
@@ -546,26 +701,25 @@ function AboutCassette({
       rotation={[0, angle, 0]}
     >
       <group ref={tiltGroupRef} rotation={[-0.09, 0, 0]}>
-        {/* cassette body — clickable. while another cassette is the
-            active selection, this one becomes a non-interactive
-            background prop: no pointer handlers wired in. */}
+        {/* cassette body — clickable only while About is entered and this
+            cassette isn't backgrounded by another open one. */}
         <group
           ref={cassetteGroupRef}
-          onPointerDown={isAnotherOpen ? undefined : handleClick}
+          onPointerDown={interactive ? handleClick : undefined}
           onPointerOver={
-            isAnotherOpen
-              ? undefined
-              : (e) => {
+            interactive
+              ? (e) => {
                   e.stopPropagation();
                   document.body.style.cursor = "pointer";
                 }
+              : undefined
           }
           onPointerOut={
-            isAnotherOpen
-              ? undefined
-              : () => {
+            interactive
+              ? () => {
                   document.body.style.cursor = "";
                 }
+              : undefined
           }
         >
           {/* ===== BACK HALF (static — J-card tray side) =====
@@ -616,25 +770,25 @@ function AboutCassette({
               clippingPlanes={CASSETTE_CLIPPING_PLANES}
             />
           </mesh>
-          {/* cream J-card paper insert — sits recessed against the
-              back wall of the back half. fades in once the case is
-              fully open so the closed case still reads as the cassette
-              face through the transparent front lid. */}
-          <mesh
-            position={[0, 0, -CASE_D / 2 + 0.007]}
-            renderOrder={3}
-          >
-            <planeGeometry args={[CASSETTE_W * 0.92, CASSETTE_H * 0.9]} />
-            <meshBasicMaterial
-              ref={jcardInsertMatRef}
-              color="#f3e8d0"
-              transparent
-              opacity={0}
-              toneMapped={false}
-              side={THREE.DoubleSide}
-              clippingPlanes={CASSETTE_CLIPPING_PLANES}
-            />
-          </mesh>
+          {/* cream J-card paper insert — sits recessed against the back
+              wall of the back half. wrapped in paperGroupRef so the extract
+              + flip phase (slide forward in +Z, rotate -π/2 around local Z)
+              animates independently of the case. its projected screen rect
+              is what the DOM JCardPage morphs out of. */}
+          <group ref={paperGroupRef} position={[0, 0, -CASE_D / 2 + 0.007]}>
+            <mesh ref={paperMeshRef} renderOrder={3}>
+              <planeGeometry args={[CASSETTE_W * 0.92, CASSETTE_H * 0.9]} />
+              <meshBasicMaterial
+                ref={jcardInsertMatRef}
+                color="#f3e8d0"
+                transparent
+                opacity={0}
+                toneMapped={false}
+                side={THREE.DoubleSide}
+                clippingPlanes={CASSETTE_CLIPPING_PLANES}
+              />
+            </mesh>
+          </group>
           {/* thin molded rails inside the well that "hold" the J-card */}
           {[CASSETTE_H * 0.43, -CASSETTE_H * 0.43].map((ry, i) => (
             <mesh
@@ -667,6 +821,96 @@ function AboutCassette({
               clippingPlanes={CASSETTE_CLIPPING_PLANES}
             />
           </lineSegments>
+          {/* printed J-card content — anchored to the cream paper insert
+              already in the back half so the text reads as ink on a real
+              piece of paper. mounted once the lid has had time to swing
+              open (readReady). the wrapping group counter-rotates -90° on
+              Z so when the parent rolls into the portrait pose the html
+              ends up upright in world space. the inner div cross-fades
+              its opacity to 0 when the DOM JCardPage takes over, so the
+              transition reads as the same paper expanding to fill the
+              viewport rather than a separate page suddenly appearing. */}
+          {readReady && (
+            <group
+              position={[0, 0, -CASE_D / 2 + 0.012]}
+              rotation={[0, 0, -Math.PI / 2]}
+            >
+              <Html
+                transform
+                occlude={false}
+                scale={jCardHtmlScale}
+                pointerEvents="none"
+                zIndexRange={[10, 0]}
+              >
+                <div
+                  ref={scrollerRef}
+                  tabIndex={-1}
+                  role="document"
+                  aria-hidden
+                  aria-label={`${slab.heading} liner notes`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerMove={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  onPointerCancel={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                  style={{
+                    scrollbarWidth: "none",
+                    opacity: 0,
+                    transition: reducedMotion
+                      ? "none"
+                      : "opacity 520ms ease",
+                    pointerEvents: "none",
+                  }}
+                  className="jcard-content h-[430px] w-[300px] touch-pan-y overflow-y-auto overscroll-contain bg-transparent px-7 pb-8 pt-9 text-[#221708] outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-amber-700/40 sm:w-[320px] [&::-webkit-scrollbar]:hidden"
+                >
+                  <p className="text-[10px] font-medium uppercase tracking-[0.42em] text-[#7a5b1e]">
+                    Side {["A", "A", "B"][trackIndex] ?? "A"} · Track{" "}
+                    {trackNumber}
+                  </p>
+                  <h2 className="mt-2 font-[family-name:var(--font-display)] text-[28px] leading-[1.02] tracking-[-0.005em] text-[#1a1208]">
+                    {slab.heading}
+                  </h2>
+                  {slab.tagline && (
+                    <p className="mt-2 text-[12px] italic leading-[1.45] text-[#5a4520]">
+                      {slab.tagline}
+                    </p>
+                  )}
+                  <div aria-hidden className="my-4 h-px w-14 bg-[#a8895a]" />
+                  <div className="space-y-3 text-[12.5px] leading-[1.65] text-[#221708]">
+                    {(slab.paragraphs ?? [slab.detail ?? slab.body]).map(
+                      (para, i) => (
+                        <p key={i}>{para}</p>
+                      ),
+                    )}
+                  </div>
+                  {slab.credits && slab.credits.length > 0 && (
+                    <>
+                      <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.42em] text-[#7a5b1e]">
+                        Credits
+                      </p>
+                      <ul className="mt-2 space-y-1 text-[11.5px] leading-[1.5] text-[#221708]">
+                        {slab.credits.map((c) => (
+                          <li key={c} className="flex gap-2">
+                            <span aria-hidden className="text-[#a8895a]">
+                              —
+                            </span>
+                            <span>{c}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  <div className="mt-6 flex items-center justify-between border-t border-[#c8b48a]/70 pt-2 text-[9px] uppercase tracking-[0.42em] text-[#7a5b1e]">
+                    <span>{slab.meta}</span>
+                    <span>Oziel Sauceda</span>
+                  </div>
+                  <p className="mt-4 text-[8.5px] uppercase tracking-[0.38em] text-[#a8895a]">
+                    ESC closes · scroll for more
+                  </p>
+                </div>
+              </Html>
+            </group>
+          )}
           {/* ===== FRONT HALF (rotates around the spine when open) =====
               carries the cassette + the visible clear lid plastic.
               pivots around the top long edge in the landscape frame,
@@ -1013,6 +1257,11 @@ function AboutCassetteRing({
   entered,
   reducedMotion,
   ringRotationRef,
+  aboutPageActive,
+  paperProgressRef,
+  jcardScreenRectRef,
+  onSelectionChange,
+  onPageCloseRequest,
 }: Props) {
   const ringRef = useRef<THREE.Group>(null);
   const entryProgressRef = useEaseLerp(
@@ -1034,20 +1283,32 @@ function AboutCassetteRing({
     }
   }, [entered]);
 
+  // bubble selection up so the parent stage can drive the read-mode camera.
+  // fires on every change including the post-exit reset.
+  useEffect(() => {
+    onSelectionChange?.(selectedIndex);
+  }, [selectedIndex, onSelectionChange]);
+
   // ESC closes an open J-card without exiting the section. parent's ESC
-  // handler still exits when no panel is open.
+  // handler still exits when no panel is open. when the DOM page is up, we
+  // hand off to the page-close orchestration so the morph plays in reverse
+  // before the cassette closes.
   useEffect(() => {
     if (selectedIndex === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        setSelectedIndex(null);
+        if (aboutPageActive && onPageCloseRequest) {
+          onPageCloseRequest();
+        } else {
+          setSelectedIndex(null);
+        }
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () =>
       window.removeEventListener("keydown", onKey, { capture: true });
-  }, [selectedIndex]);
+  }, [selectedIndex, aboutPageActive, onPageCloseRequest]);
 
   useFrame((_, delta) => {
     const g = ringRef.current;
@@ -1078,6 +1339,13 @@ function AboutCassetteRing({
           trackIndex={i}
           isOpen={selectedIndex === i}
           isAnotherOpen={selectedIndex !== null && selectedIndex !== i}
+          pageActive={!!aboutPageActive && selectedIndex === i}
+          paperProgressRef={
+            selectedIndex === i ? paperProgressRef : undefined
+          }
+          jcardScreenRectRef={
+            selectedIndex === i ? jcardScreenRectRef : undefined
+          }
           onSelect={() =>
             setSelectedIndex((cur) => (cur === i ? null : i))
           }
@@ -1096,3 +1364,5 @@ function AboutCassetteRing({
 export function AboutGlobeReveal(props: Props) {
   return <AboutCassetteRing {...props} />;
 }
+
+export type { Props as AboutGlobeRevealProps };
