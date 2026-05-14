@@ -15,8 +15,11 @@ export const SECTION_CAMERA_TARGETS: Record<SectionId, CameraTarget> = {
     lookAt: [0, 1.78, 0],
   },
   projects: {
-    position: [0, 1.95, 3.95],
-    lookAt: [0, 1.78, 0],
+    // CD cases are ~0.82 wide vs. the cassettes' ~1.3, so the same
+    // camera distance reads as further away. closer z compensates and
+    // matches the cassettes' apparent zoom on entry.
+    position: [0, 1.93, 3.05],
+    lookAt: [0, 1.8, 0],
   },
   research: {
     position: [0, 1.72, 4.85],

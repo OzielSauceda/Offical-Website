@@ -1267,7 +1267,7 @@ function AboutCassetteRing({
   const entryProgressRef = useEaseLerp(
     entered,
     reducedMotion,
-    1.6,
+    2.2,
     EXIT_DURATION,
   );
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);

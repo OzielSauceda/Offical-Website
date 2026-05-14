@@ -991,19 +991,190 @@ export function createCassetteBackTexture(
   return tex;
 }
 
-// full-face CD-in-clear-case texture for the Projects section reveal.
-// matches the square minidisc / recordable-CD look: translucent plastic
-// shell with mold details, iridescent disc with conic rainbow + concentric
-// data tracks + silver chrome hub + center hole, top "INSERT THIS END"
-// arrow, "80" capacity stamp, vertical "RECORDABLE MD" marker, MD logo
-// bottom-center, date/serial near the disc edge, and a lavender sticker
-// band wrapping across the middle-right carrying the project copy.
-export function createCdCaseFaceTexture(
+// front-of-case mold detail layer for the Projects CD prop. drawn on
+// transparent background — only the molded plastic features (corner
+// clips, edge bevel, latch grooves, raised slots, bubble screws, header
+// arrow, "80" stamp, MD logo) are visible. the disc and the lavender
+// sticker live on their own meshes so the side view shows a circular
+// disc inside a clear case instead of a square interior card.
+export function createCdCaseShellFaceTexture(
+  seed: number,
+): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  const rand = rng(0x7e00 + seed * 37);
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  // canvas left transparent — the case shell mesh + box already supply
+  // the translucent surface. only the molded features are drawn here.
+
+  // very sparse plastic grain so the surface reads as having texture
+  // without filling in alpha
+  for (let i = 0; i < W * H * 0.003; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
+    ctx.fillStyle = `rgba(80, 90, 110, ${0.04 + rand() * 0.08})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  // corner + side-midpoint mold clips
+  const moldDots: Array<[number, number]> = [
+    [50, 70],
+    [W - 50, 70],
+    [50, H - 70],
+    [W - 50, H - 70],
+    [40, H * 0.5],
+    [W - 40, H * 0.5],
+  ];
+  for (const [mx, my] of moldDots) {
+    ctx.fillStyle = "rgba(180, 188, 200, 0.55)";
+    ctx.beginPath();
+    ctx.arc(mx, my, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(220, 226, 235, 0.75)";
+    ctx.beginPath();
+    ctx.arc(mx, my, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(150, 160, 175, 0.55)";
+    ctx.beginPath();
+    ctx.arc(mx, my, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // edge bevel rectangles
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(24, 24, W - 48, H - 48);
+  ctx.strokeStyle = "rgba(120, 130, 145, 0.45)";
+  ctx.strokeRect(28, 28, W - 56, H - 56);
+
+  // inner wall edge ridges
+  ctx.fillStyle = "rgba(200, 210, 225, 0.55)";
+  ctx.fillRect(36, 140, 2, H - 280);
+  ctx.fillRect(W - 38, 140, 2, H - 280);
+  ctx.fillStyle = "rgba(110, 120, 138, 0.45)";
+  ctx.fillRect(40, 140, 1, H - 280);
+  ctx.fillRect(W - 41, 140, 1, H - 280);
+
+  // latch grooves on both inside walls
+  for (let side = 0; side < 2; side++) {
+    const baseX = side === 0 ? 42 : W - 56;
+    for (let i = 0; i < 3; i++) {
+      const ly = H * 0.32 + i * 110;
+      ctx.fillStyle = "rgba(110, 120, 138, 0.55)";
+      ctx.fillRect(baseX, ly, 14, 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.fillRect(baseX, ly + 2, 14, 1);
+    }
+  }
+
+  // raised rounded rectangle slots along the bottom
+  const raisedRects: Array<[number, number, number]> = [
+    [120, H - 56, 80],
+    [W - 200, H - 56, 80],
+  ];
+  for (const [rx, ry, rw] of raisedRects) {
+    ctx.fillStyle = "rgba(220, 226, 235, 0.6)";
+    ctx.fillRect(rx, ry, rw, 14);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.fillRect(rx, ry, rw, 1);
+    ctx.fillStyle = "rgba(110, 120, 138, 0.5)";
+    ctx.fillRect(rx, ry + 13, rw, 1);
+  }
+
+  // bubble screws
+  const bubbles: Array<[number, number]> = [
+    [88, 110],
+    [W - 88, 110],
+    [88, H - 110],
+    [W - 88, H - 110],
+    [W / 2 - 6, H - 24],
+  ];
+  for (const [bx, by] of bubbles) {
+    const bg = ctx.createRadialGradient(bx - 1, by - 1, 0, bx, by, 5);
+    bg.addColorStop(0, "rgba(255, 255, 255, 0.78)");
+    bg.addColorStop(1, "rgba(140, 150, 168, 0.5)");
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(bx, by, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(60, 70, 90, 0.55)";
+    ctx.beginPath();
+    ctx.arc(bx, by, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // header "INSERT THIS END ▼"
+  ctx.fillStyle = "#1a1614";
+  ctx.font = `700 22px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  letterSpacingSetter.letterSpacing = "2px";
+  const headerY = 100;
+  ctx.fillText("INSERT THIS END", W / 2 + 30, headerY);
+  letterSpacingSetter.letterSpacing = "0px";
+  ctx.beginPath();
+  const triX = W / 2 - 100;
+  ctx.moveTo(triX - 10, headerY - 8);
+  ctx.lineTo(triX + 10, headerY - 8);
+  ctx.lineTo(triX, headerY + 8);
+  ctx.closePath();
+  ctx.fill();
+
+  // "80" capacity stamp upper-right
+  ctx.font = `800 78px "Helvetica", "Arial", sans-serif`;
+  ctx.fillStyle = "#1a1614";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("80", W - 90, 270);
+
+  // MD logo bottom-center
+  const logoCX = W / 2;
+  const logoCY = H - 110;
+  const logoW = 70;
+  const logoH = 44;
+  ctx.fillStyle = "rgba(40, 40, 50, 0.92)";
+  ctx.fillRect(logoCX - logoW / 2, logoCY - logoH / 2, logoW, logoH);
+  ctx.fillStyle = "rgba(220, 226, 235, 0.98)";
+  ctx.font = `800 19px "Impact", "Arial Narrow Bold", sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("M", logoCX - logoW / 2 + 8, logoCY - 9);
+  ctx.fillText("D", logoCX - logoW / 2 + 8, logoCY + 11);
+  ctx.font = `400 9px "Arial Narrow", sans-serif`;
+  letterSpacingSetter.letterSpacing = "1px";
+  ctx.fillText("MINI", logoCX - logoW / 2 + 26, logoCY - 13);
+  ctx.fillText("DISC", logoCX - logoW / 2 + 26, logoCY - 1);
+  ctx.fillText("RECORDABLE", logoCX - logoW / 2 + 26, logoCY + 11);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// circular CD/minidisc texture for the Projects prop. drawn centered
+// in a square canvas with a radius that fills the canvas so a
+// CircleGeometry mesh can sample the whole disc. iridescent rainbow,
+// data rings, glare streak, hub, lead-in groove, and curved technical
+// text are all baked here.
+export function createCdDiscTexture(
   seed: number,
   trackNumber: string,
-  heading: string,
-  body: string,
-  meta: string,
 ): THREE.CanvasTexture {
   const W = 1024;
   const H = 1024;
@@ -1014,104 +1185,21 @@ export function createCdCaseFaceTexture(
   if (!ctx) throw new Error("no 2d ctx");
 
   const rand = rng(0x7c00 + seed * 29);
-  const upperHeading = heading.toUpperCase();
   const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
     letterSpacing?: string;
   };
 
-  // ── clear plastic case background ──
-  // very light gray with subtle vertical gradient so the case feels
-  // translucent against the dark scene behind it. brighter near the top
-  // edge to suggest overhead key light catching the glossy plastic.
-  const caseGrad = ctx.createLinearGradient(0, 0, 0, H);
-  caseGrad.addColorStop(0, "#f0f1f4");
-  caseGrad.addColorStop(0.5, "#e2e4ea");
-  caseGrad.addColorStop(1, "#c8ccd3");
-  ctx.fillStyle = caseGrad;
-  ctx.fillRect(0, 0, W, H);
+  const discCX = W / 2;
+  const discCY = H / 2;
+  const discR = W / 2 - 4;
 
-  // subtle plastic grain
-  for (let i = 0; i < W * H * 0.012; i++) {
-    const x = Math.floor(rand() * W);
-    const y = Math.floor(rand() * H);
-    ctx.fillStyle = `rgba(80, 90, 110, ${0.02 + rand() * 0.06})`;
-    ctx.fillRect(x, y, 1, 1);
-  }
-
-  // ── plastic case mold details ──
-  // small circular clips/snaps at the four inside corners of the case,
-  // like the molding marks on a real CD jewel insert
-  const moldDots: Array<[number, number]> = [
-    [50, 70],
-    [W - 50, 70],
-    [50, H - 70],
-    [W - 50, H - 70],
-    [40, H * 0.5],
-    [W - 40, H * 0.5],
-  ];
-  for (const [mx, my] of moldDots) {
-    ctx.fillStyle = "rgba(180, 188, 200, 0.5)";
-    ctx.beginPath();
-    ctx.arc(mx, my, 14, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(220, 226, 235, 0.7)";
-    ctx.beginPath();
-    ctx.arc(mx, my, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(150, 160, 175, 0.4)";
-    ctx.beginPath();
-    ctx.arc(mx, my, 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // edge bevel — very subtle inner outline so the case reads as having a
-  // raised frame around the disc compartment
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(24, 24, W - 48, H - 48);
-  ctx.strokeStyle = "rgba(120, 130, 145, 0.3)";
-  ctx.strokeRect(28, 28, W - 56, H - 56);
-
-  // ── header text: INSERT THIS END ▼ ──
-  ctx.fillStyle = "#1a1614";
-  ctx.font = `700 22px "Arial Narrow", "Helvetica", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  letterSpacingSetter.letterSpacing = "2px";
-  const headerY = 100;
-  ctx.fillText("INSERT THIS END", W / 2 + 30, headerY);
-  letterSpacingSetter.letterSpacing = "0px";
-  // small downward triangle to the left of the text
-  ctx.beginPath();
-  const triX = W / 2 - 100;
-  ctx.moveTo(triX - 10, headerY - 8);
-  ctx.lineTo(triX + 10, headerY - 8);
-  ctx.lineTo(triX, headerY + 8);
-  ctx.closePath();
-  ctx.fill();
-
-  // ── "80" capacity stamp upper-right ──
-  ctx.font = `800 78px "Helvetica", "Arial", sans-serif`;
-  ctx.fillStyle = "#1a1614";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("80", W - 90, 270);
-
-  // ── disc area ──
-  const discCX = W * 0.46;
-  const discCY = H * 0.52;
-  const discR = 360;
-
-  // disc base — silver / chrome reflective surface
+  // silver base
   ctx.fillStyle = "#d8d8de";
   ctx.beginPath();
   ctx.arc(discCX, discCY, discR, 0, Math.PI * 2);
   ctx.fill();
 
-  // conic-gradient iridescent rainbow over the disc base. modern browsers
-  // (Chrome, Firefox, Safari >=15) support createConicGradient. if it
-  // isn't available we skip it and the disc stays silver — still reads as
-  // a CD just less colorful. fallback hue ring drawn as multiple radial
-  // gradients below.
+  // iridescent conic rainbow
   const ctxAny = ctx as CanvasRenderingContext2D & {
     createConicGradient?: (
       startAngle: number,
@@ -1139,7 +1227,6 @@ export function createCdCaseFaceTexture(
     ctx.arc(discCX, discCY, discR, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    // fallback — multiple stacked radial gradients to approximate hue shift
     const fallbackPalette = [
       "rgba(255, 110, 200, 0.45)",
       "rgba(160, 230, 130, 0.45)",
@@ -1167,15 +1254,13 @@ export function createCdCaseFaceTexture(
     });
   }
 
-  // concentric data-track rings — very thin alternating light/dark arcs
-  // that simulate the diffraction grating of pressed pits on a CD.
-  // composited as source-atop so the rings only appear over the disc.
+  // concentric data rings (clipped to disc)
   ctx.save();
   ctx.beginPath();
   ctx.arc(discCX, discCY, discR, 0, Math.PI * 2);
   ctx.clip();
-  for (let i = 0; i < 110; i++) {
-    const t = i / 109;
+  for (let i = 0; i < 130; i++) {
+    const t = i / 129;
     const ringR = discR * (0.18 + 0.82 * t);
     const dark = i % 2 === 0;
     ctx.strokeStyle = dark
@@ -1188,22 +1273,42 @@ export function createCdCaseFaceTexture(
   }
   ctx.restore();
 
-  // disc outer edge — thin highlight ring so the disc has a defined edge
+  // edge: light highlight + darker rim + outer plastic shadow
   ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(discCX, discCY, discR - 1, 0, Math.PI * 2);
   ctx.stroke();
-  // and an outer subtle shadow ring for plastic depth
+  ctx.strokeStyle = "rgba(28, 34, 46, 0.34)";
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, discR - 5, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.strokeStyle = "rgba(40, 50, 60, 0.35)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.arc(discCX, discCY, discR + 2, 0, Math.PI * 2);
+  ctx.arc(discCX, discCY, discR - 12, 0, Math.PI * 2);
   ctx.stroke();
 
-  // ── center silver hub ──
+  // soft iridescent glare streak (clipped to disc)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, discR - 4, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.translate(discCX, discCY);
+  ctx.rotate(-Math.PI / 5);
+  const glareGrad = ctx.createLinearGradient(0, -discR, 0, discR);
+  glareGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
+  glareGrad.addColorStop(0.42, "rgba(255, 255, 255, 0.1)");
+  glareGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.24)");
+  glareGrad.addColorStop(0.58, "rgba(255, 255, 255, 0.1)");
+  glareGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = glareGrad;
+  ctx.fillRect(-discR, -discR * 0.22, discR * 2, discR * 0.44);
+  ctx.restore();
+
+  // silver hub
   const hubR = discR * 0.22;
-  // metallic radial gradient hub
   const hubGrad = ctx.createRadialGradient(
     discCX - hubR * 0.3,
     discCY - hubR * 0.3,
@@ -1219,32 +1324,67 @@ export function createCdCaseFaceTexture(
   ctx.beginPath();
   ctx.arc(discCX, discCY, hubR, 0, Math.PI * 2);
   ctx.fill();
-  // inner darker ring around the hub
   ctx.strokeStyle = "rgba(20, 22, 28, 0.6)";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(discCX, discCY, hubR - 3, 0, Math.PI * 2);
+  ctx.arc(discCX, discCY, hubR - 4, 0, Math.PI * 2);
   ctx.stroke();
-  // inner machined ring detail
-  ctx.strokeStyle = "rgba(60, 64, 72, 0.45)";
+  ctx.strokeStyle = "rgba(60, 64, 72, 0.5)";
   ctx.lineWidth = 1;
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
     ctx.arc(discCX, discCY, hubR * (0.55 + i * 0.12), 0, Math.PI * 2);
     ctx.stroke();
   }
-  // tiny center hole
+  // center hole
   ctx.fillStyle = "#080a10";
   ctx.beginPath();
-  ctx.arc(discCX, discCY, 12, 0, Math.PI * 2);
+  ctx.arc(discCX, discCY, 18, 0, Math.PI * 2);
   ctx.fill();
 
-  // ── vertical "RECORDABLE MD" text on the right side of the disc ──
-  // rotated 90° clockwise so it reads bottom-up next to the disc edge
+  // darker inner ring just outside the hub
+  ctx.strokeStyle = "rgba(20, 24, 32, 0.45)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, hubR + 18, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.24)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, hubR + 21, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // curved technical text on the left arc
+  const techRadius = hubR + 48;
+  const techText = `RECORDABLE MD · PROJECT DISC · TRACK ${trackNumber} · `;
+  const arcCenter = Math.PI;
+  const arcSpan = Math.PI * 0.95;
+  ctx.save();
+  ctx.fillStyle = "rgba(28, 30, 40, 0.8)";
+  ctx.font = `600 16px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  letterSpacingSetter.letterSpacing = "1px";
+  const totalChars = techText.length;
+  for (let i = 0; i < totalChars; i++) {
+    const t = i / Math.max(1, totalChars - 1);
+    const angle = arcCenter - arcSpan / 2 + arcSpan * t;
+    const x = discCX + Math.cos(angle) * techRadius;
+    const y = discCY + Math.sin(angle) * techRadius;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle - Math.PI / 2);
+    ctx.fillText(techText[i] ?? "", 0, 0);
+    ctx.restore();
+  }
+  letterSpacingSetter.letterSpacing = "0px";
+  ctx.restore();
+
+  // vertical "RECORDABLE MD" on the right
   ctx.save();
   ctx.translate(discCX + discR * 0.74, discCY + discR * 0.25);
   ctx.rotate(-Math.PI / 2);
-  ctx.font = `700 18px "Arial", "Helvetica", sans-serif`;
+  ctx.font = `700 26px "Arial", "Helvetica", sans-serif`;
   ctx.fillStyle = "#1a1614";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
@@ -1253,13 +1393,12 @@ export function createCdCaseFaceTexture(
   letterSpacingSetter.letterSpacing = "0px";
   ctx.restore();
 
-  // tiny date/serial stamp rotated near the disc edge (like a catalogue
-  // number on the disc itself)
+  // date/serial near the disc edge
   ctx.save();
   ctx.translate(discCX + discR * 0.78, discCY - discR * 0.05);
   ctx.rotate(-Math.PI / 2);
-  ctx.font = `500 13px "Arial Narrow", "Helvetica", sans-serif`;
-  ctx.fillStyle = "rgba(40, 30, 26, 0.7)";
+  ctx.font = `500 18px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.fillStyle = "rgba(40, 30, 26, 0.72)";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   letterSpacingSetter.letterSpacing = "1px";
@@ -1269,97 +1408,99 @@ export function createCdCaseFaceTexture(
   letterSpacingSetter.letterSpacing = "0px";
   ctx.restore();
 
-  // ── Mini Disc-style logo bottom-center ──
-  // a small stylized "M/D" stacked mark inside a rounded rectangle. not
-  // the actual MiniDisc trademark, just an evocative typographic block.
-  const logoCX = W / 2;
-  const logoCY = H - 110;
-  const logoW = 70;
-  const logoH = 44;
-  ctx.fillStyle = "rgba(40, 40, 50, 0.85)";
-  ctx.fillRect(logoCX - logoW / 2, logoCY - logoH / 2, logoW, logoH);
-  ctx.fillStyle = "rgba(220, 226, 235, 0.95)";
-  ctx.font = `800 19px "Impact", "Arial Narrow Bold", sans-serif`;
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillText("M", logoCX - logoW / 2 + 8, logoCY - 9);
-  ctx.fillText("D", logoCX - logoW / 2 + 8, logoCY + 11);
-  ctx.font = `400 9px "Arial Narrow", sans-serif`;
-  letterSpacingSetter.letterSpacing = "1px";
-  ctx.fillText("MINI", logoCX - logoW / 2 + 26, logoCY - 13);
-  ctx.fillText("DISC", logoCX - logoW / 2 + 26, logoCY - 1);
-  ctx.fillText("RECORDABLE", logoCX - logoW / 2 + 26, logoCY + 11);
-  letterSpacingSetter.letterSpacing = "0px";
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
 
-  // ── lavender sticker band wrapping across the middle-right of the case ──
-  // a horizontal paper band that physically wraps around the disc + case
-  // edge. it carries the project's heading, meta, and body copy.
-  const stickerX = W * 0.55;
-  const stickerY = H * 0.36;
-  const stickerW = W * 0.43;
-  const stickerH = H * 0.28;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
 
-  // shadow under the sticker so it reads as physically resting on the case
-  ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-  ctx.fillRect(stickerX + 6, stickerY + 8, stickerW, stickerH);
+// lavender project label/sleeve for the Projects CD prop. drawn as its
+// own rectangular texture so the label is a separate plane sitting in
+// front of the transparent case, not painted onto the case glass.
+export function createCdStickerTexture(
+  seed: number,
+  trackNumber: string,
+  heading: string,
+  body: string,
+  meta: string,
+): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 668;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
 
-  // sticker paper — lavender with subtle vertical gradient and grain
-  const stickerGrad = ctx.createLinearGradient(0, stickerY, 0, stickerY + stickerH);
+  const rand = rng(0x7f00 + seed * 41);
+  const upperHeading = heading.toUpperCase();
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  // sticker paper — lavender gradient
+  const stickerGrad = ctx.createLinearGradient(0, 0, 0, H);
   stickerGrad.addColorStop(0, "#c6a3d8");
   stickerGrad.addColorStop(0.5, "#b896d4");
   stickerGrad.addColorStop(1, "#9b7cbc");
   ctx.fillStyle = stickerGrad;
-  ctx.fillRect(stickerX, stickerY, stickerW, stickerH);
+  ctx.fillRect(0, 0, W, H);
 
-  // paper fiber grain on the sticker
-  for (let i = 0; i < stickerW * stickerH * 0.04; i++) {
-    const x = stickerX + Math.floor(rand() * stickerW);
-    const y = stickerY + Math.floor(rand() * stickerH);
+  // paper fiber grain
+  for (let i = 0; i < W * H * 0.04; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
     const dark = rand() > 0.5;
     ctx.fillStyle = dark
       ? `rgba(60, 30, 80, ${0.04 + rand() * 0.12})`
       : `rgba(250, 240, 255, ${0.05 + rand() * 0.12})`;
     ctx.fillRect(x, y, 1, 1);
   }
-  // sticker edge tear/highlight along the top
-  ctx.fillStyle = "rgba(255, 250, 255, 0.45)";
-  ctx.fillRect(stickerX, stickerY, stickerW, 2);
-  // sticker right-edge wrap-around shadow (where it folds over the case edge)
-  ctx.fillStyle = "rgba(70, 40, 90, 0.5)";
-  ctx.fillRect(stickerX + stickerW - 12, stickerY, 12, stickerH);
+  // top edge highlight
+  ctx.fillStyle = "rgba(255, 250, 255, 0.5)";
+  ctx.fillRect(0, 0, W, 4);
+  // subtle right-edge wear shadow
+  ctx.fillStyle = "rgba(70, 40, 90, 0.4)";
+  ctx.fillRect(W - 14, 0, 14, H);
 
-  // sticker content — track number top-left
+  // track number top-left
   ctx.fillStyle = "rgba(30, 16, 50, 0.92)";
-  ctx.font = `700 14px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.font = `700 32px "Arial Narrow", "Helvetica", sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
   letterSpacingSetter.letterSpacing = "3px";
-  ctx.fillText(`TRACK ${trackNumber}`, stickerX + 22, stickerY + 22);
+  ctx.fillText(`TRACK ${trackNumber}`, 50, 50);
   letterSpacingSetter.letterSpacing = "0px";
-  // thin divider line
-  ctx.fillStyle = "rgba(30, 16, 50, 0.5)";
-  ctx.fillRect(stickerX + 22, stickerY + 46, stickerW - 56, 1);
 
-  // sticker heading — big condensed caps
+  // divider line
+  ctx.fillStyle = "rgba(30, 16, 50, 0.55)";
+  ctx.fillRect(50, 108, W - 130, 2);
+
+  // heading — big condensed caps
   ctx.fillStyle = "#1a0830";
-  ctx.font = `800 30px "Impact", "Arial Narrow Bold", sans-serif`;
+  ctx.font = `800 70px "Impact", "Arial Narrow Bold", sans-serif`;
   letterSpacingSetter.letterSpacing = "2px";
-  ctx.fillText(upperHeading, stickerX + 22, stickerY + 58);
+  ctx.fillText(upperHeading, 50, 130);
   letterSpacingSetter.letterSpacing = "0px";
 
-  // sticker body — small wrapped paragraph
+  // wrapped body paragraph
   ctx.fillStyle = "#241038";
-  ctx.font = `400 14px "Arial", "Helvetica", sans-serif`;
-  const bodyMaxW = stickerW - 44;
-  const bodyStartY = stickerY + 100;
-  const bodyLineH = 18;
+  ctx.font = `400 32px "Arial", "Helvetica", sans-serif`;
+  const bodyMaxW = W - 100;
+  const bodyStartY = 230;
+  const bodyLineH = 42;
   const bodyWords = body.split(/\s+/);
   let bodyLine = "";
   let bodyLineCount = 0;
   for (const w of bodyWords) {
     const test = bodyLine ? `${bodyLine} ${w}` : w;
     if (ctx.measureText(test).width > bodyMaxW && bodyLine) {
-      ctx.fillText(bodyLine, stickerX + 22, bodyStartY + bodyLineCount * bodyLineH);
+      ctx.fillText(bodyLine, 50, bodyStartY + bodyLineCount * bodyLineH);
       bodyLine = w;
       bodyLineCount += 1;
     } else {
@@ -1367,19 +1508,501 @@ export function createCdCaseFaceTexture(
     }
   }
   if (bodyLine) {
-    ctx.fillText(bodyLine, stickerX + 22, bodyStartY + bodyLineCount * bodyLineH);
+    ctx.fillText(bodyLine, 50, bodyStartY + bodyLineCount * bodyLineH);
   }
-  // sticker meta — small caps bottom-right of the sticker
-  ctx.font = `600 11px "Arial Narrow", sans-serif`;
-  ctx.fillStyle = "rgba(30, 16, 50, 0.78)";
+
+  // meta — small caps bottom-right
+  ctx.font = `600 26px "Arial Narrow", sans-serif`;
+  ctx.fillStyle = "rgba(30, 16, 50, 0.8)";
   ctx.textAlign = "right";
   letterSpacingSetter.letterSpacing = "2px";
+  ctx.fillText(meta.toUpperCase(), W - 50, H - 60);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+
+// interior tray layer for the Projects CD prop. drawn at low overall
+// alpha so it reads as the frosted inside of a clear jewel case when
+// seen through the transparent front pane. carries a faint cream paper
+// insert + a recessed disc well shadow + subtle latch grooves. the
+// disc mesh sits in front of this layer and covers most of it; only
+// the border around the disc and the empty top/left strips are
+// actually visible from front.
+export function createCdCaseTrayTexture(
+  seed: number,
+): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  const rand = rng(0x8000 + seed * 43);
+
+  // faint frosted plastic wash across the whole interior
+  ctx.fillStyle = "rgba(230, 234, 244, 0.22)";
+  ctx.fillRect(0, 0, W, H);
+
+  // cream paper insert behind the disc — sits within the molded tray
+  // walls. soft drop shadow underneath so it reads as a real piece of
+  // paper resting against the back wall.
+  const paperX = 70;
+  const paperY = 130;
+  const paperW = W - 140;
+  const paperH = H - 230;
+  ctx.fillStyle = "rgba(20, 20, 25, 0.18)";
+  ctx.fillRect(paperX + 8, paperY + 12, paperW, paperH);
+  const paperGrad = ctx.createLinearGradient(0, paperY, 0, paperY + paperH);
+  paperGrad.addColorStop(0, "rgba(245, 236, 218, 0.55)");
+  paperGrad.addColorStop(0.5, "rgba(234, 222, 196, 0.55)");
+  paperGrad.addColorStop(1, "rgba(212, 198, 170, 0.55)");
+  ctx.fillStyle = paperGrad;
+  ctx.fillRect(paperX, paperY, paperW, paperH);
+  // paper fiber speckle
+  for (let i = 0; i < paperW * paperH * 0.02; i++) {
+    const x = paperX + Math.floor(rand() * paperW);
+    const y = paperY + Math.floor(rand() * paperH);
+    const dark = rand() > 0.55;
+    ctx.fillStyle = dark
+      ? `rgba(80, 60, 30, ${0.04 + rand() * 0.08})`
+      : `rgba(255, 248, 226, ${0.04 + rand() * 0.08})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  // paper top edge highlight
+  ctx.fillStyle = "rgba(255, 250, 235, 0.45)";
+  ctx.fillRect(paperX, paperY, paperW, 2);
+
+  // recessed disc well — a darker ring just outside where the disc
+  // mesh sits, so when the disc covers the center the well's outer
+  // edge peeks around it like a real molded depression. positions
+  // match the disc mesh placement on the case front.
+  const discCX = W * 0.46;
+  const discCY = H * 0.52;
+  const discR = 360;
+  const wellOuter = discR + 38;
+  // soft outer shadow ring
+  const wellGrad = ctx.createRadialGradient(
+    discCX,
+    discCY,
+    discR - 6,
+    discCX,
+    discCY,
+    wellOuter,
+  );
+  wellGrad.addColorStop(0, "rgba(20, 26, 40, 0)");
+  wellGrad.addColorStop(0.55, "rgba(20, 26, 40, 0.32)");
+  wellGrad.addColorStop(1, "rgba(20, 26, 40, 0)");
+  ctx.fillStyle = wellGrad;
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, wellOuter, 0, Math.PI * 2);
+  ctx.fill();
+  // crisp well rim circle
+  ctx.strokeStyle = "rgba(40, 50, 70, 0.42)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, discR + 6, 0, Math.PI * 2);
+  ctx.stroke();
+  // light highlight ring just outside that — gives the recessed well a
+  // beveled lip rather than a flat dark stroke
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.32)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(discCX, discCY, discR + 10, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // latch grooves on the left + right inner walls — mirror the front
+  // shell's latches so the interior reads as part of the same molded
+  // case body.
+  for (let side = 0; side < 2; side++) {
+    const baseX = side === 0 ? 60 : W - 74;
+    for (let i = 0; i < 3; i++) {
+      const ly = H * 0.32 + i * 110;
+      ctx.fillStyle = "rgba(60, 70, 90, 0.32)";
+      ctx.fillRect(baseX, ly, 14, 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.32)";
+      ctx.fillRect(baseX, ly + 2, 14, 1);
+    }
+  }
+
+  // thin inner edge bevel — frame just inside the case walls
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.32)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(46, 46, W - 92, H - 92);
+  ctx.strokeStyle = "rgba(60, 70, 90, 0.3)";
+  ctx.strokeRect(50, 50, W - 100, H - 100);
+
+  // very sparse plastic grain so the tray surface isn't dead-flat
+  for (let i = 0; i < W * H * 0.004; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
+    ctx.fillStyle = `rgba(80, 90, 110, ${0.03 + rand() * 0.06})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// back-of-case texture for the Projects CD prop. translucent slate-blue
+// jewel back: corner mold clips + edge bevel echo the front, a vertical
+// spine label carries the track + heading text, a rear insert card on
+// the right lists the (anonymized) track listing for visual continuity
+// across the three cases, a barcode + catalog/serial block sits at the
+// bottom-left, and a slim lavender tab top-right echoes the front
+// sticker so it reads as the same physical piece.
+export function createCdCaseBackTexture(
+  seed: number,
+  trackNumber: string,
+  heading: string,
+  meta: string,
+): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 1024;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d ctx");
+
+  const rand = rng(0x7d00 + seed * 31);
+  const letterSpacingSetter = ctx as CanvasRenderingContext2D & {
+    letterSpacing?: string;
+  };
+
+  // slate-blue translucent plastic back — slightly cooler than the front
+  // so the back reads as the projects-palette side of the case.
+  const caseGrad = ctx.createLinearGradient(0, 0, 0, H);
+  caseGrad.addColorStop(0, "#dde2ec");
+  caseGrad.addColorStop(0.5, "#c4ccdb");
+  caseGrad.addColorStop(1, "#a8b1c6");
+  ctx.fillStyle = caseGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // plastic grain
+  for (let i = 0; i < W * H * 0.012; i++) {
+    const x = Math.floor(rand() * W);
+    const y = Math.floor(rand() * H);
+    ctx.fillStyle = `rgba(60, 70, 95, ${0.02 + rand() * 0.06})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+
+  // corner + side-midpoint mold clips — same pattern as the front so
+  // the case reads as the same molded shell
+  const moldDots: Array<[number, number]> = [
+    [50, 70],
+    [W - 50, 70],
+    [50, H - 70],
+    [W - 50, H - 70],
+    [40, H * 0.5],
+    [W - 40, H * 0.5],
+  ];
+  for (const [mx, my] of moldDots) {
+    ctx.fillStyle = "rgba(140, 152, 178, 0.55)";
+    ctx.beginPath();
+    ctx.arc(mx, my, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(210, 218, 232, 0.65)";
+    ctx.beginPath();
+    ctx.arc(mx, my, 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(110, 124, 152, 0.5)";
+    ctx.beginPath();
+    ctx.arc(mx, my, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // bevel rectangle — echoes the front edge frame
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(24, 24, W - 48, H - 48);
+  ctx.strokeStyle = "rgba(80, 92, 118, 0.35)";
+  ctx.strokeRect(28, 28, W - 56, H - 56);
+
+  // ── inner tray seam ──
+  // horizontal seam ~24% from the top where the molded back tray sits
+  // against the inner card. paired dark + light pixel rows so it reads
+  // as a beveled inner edge.
+  ctx.fillStyle = "rgba(60, 72, 96, 0.32)";
+  ctx.fillRect(60, Math.floor(H * 0.22), W - 120, 1);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.fillRect(60, Math.floor(H * 0.22) + 1, W - 120, 1);
+  ctx.fillStyle = "rgba(60, 72, 96, 0.32)";
+  ctx.fillRect(60, Math.floor(H * 0.82), W - 120, 1);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+  ctx.fillRect(60, Math.floor(H * 0.82) - 1, W - 120, 1);
+
+  // ── spine label band — vertical stripe along the left edge ──
+  // mimics the printed spine you see on a real jewel case viewed from
+  // the back. lavender to tie back to the front sticker.
+  const spineX = 56;
+  const spineW = 64;
+  const spineY = 70;
+  const spineH = H - 140;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.32)";
+  ctx.fillRect(spineX + 4, spineY + 6, spineW, spineH);
+  const spineGrad = ctx.createLinearGradient(
+    spineX,
+    spineY,
+    spineX + spineW,
+    spineY,
+  );
+  spineGrad.addColorStop(0, "#a385c2");
+  spineGrad.addColorStop(0.5, "#b896d4");
+  spineGrad.addColorStop(1, "#8a6db0");
+  ctx.fillStyle = spineGrad;
+  ctx.fillRect(spineX, spineY, spineW, spineH);
+  // tiny fiber grain on the spine
+  for (let i = 0; i < spineW * spineH * 0.045; i++) {
+    const x = spineX + Math.floor(rand() * spineW);
+    const y = spineY + Math.floor(rand() * spineH);
+    const dark = rand() > 0.55;
+    ctx.fillStyle = dark
+      ? `rgba(50, 24, 70, ${0.04 + rand() * 0.1})`
+      : `rgba(250, 240, 255, ${0.05 + rand() * 0.1})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  // spine printed text — rotated 90° so it reads vertically along the
+  // strip. small caps, projects-palette accent colour for "PROJECTS".
+  ctx.save();
+  ctx.translate(spineX + spineW / 2, spineY + spineH - 32);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#1a0830";
+  ctx.font = `800 22px "Impact", "Arial Narrow Bold", sans-serif`;
+  letterSpacingSetter.letterSpacing = "3px";
+  ctx.fillText(`TRACK ${trackNumber}`, 0, -2);
+  letterSpacingSetter.letterSpacing = "0px";
+  ctx.font = `800 28px "Impact", "Arial Narrow Bold", sans-serif`;
+  letterSpacingSetter.letterSpacing = "2px";
+  const upperHeading = heading.toUpperCase();
+  ctx.fillText(upperHeading, 170, -2);
+  letterSpacingSetter.letterSpacing = "0px";
+  // small caps tail "PROJECTS B-SIDE"
+  ctx.font = `600 14px "Arial Narrow", sans-serif`;
+  ctx.fillStyle = "rgba(30, 16, 50, 0.78)";
+  letterSpacingSetter.letterSpacing = "4px";
+  ctx.fillText("PROJECTS B-SIDE", spineH - 240, -2);
+  letterSpacingSetter.letterSpacing = "0px";
+  ctx.restore();
+
+  // ── rear insert card on the right side — the cream paper backing
+  // that sits behind the disc when the case is closed. holds the
+  // track listing + meta. shadowed so it reads as physically tucked
+  // in front of the back panel.
+  const cardX = spineX + spineW + 60;
+  const cardY = 130;
+  const cardW = W - cardX - 70;
+  const cardH = H - cardY - 200;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+  ctx.fillRect(cardX + 8, cardY + 10, cardW, cardH);
+  const cardGrad = ctx.createLinearGradient(0, cardY, 0, cardY + cardH);
+  cardGrad.addColorStop(0, "#f3ecd9");
+  cardGrad.addColorStop(0.5, "#e8dfc6");
+  cardGrad.addColorStop(1, "#d6caab");
+  ctx.fillStyle = cardGrad;
+  ctx.fillRect(cardX, cardY, cardW, cardH);
+  // paper fiber grain
+  for (let i = 0; i < cardW * cardH * 0.04; i++) {
+    const x = cardX + Math.floor(rand() * cardW);
+    const y = cardY + Math.floor(rand() * cardH);
+    const dark = rand() > 0.5;
+    ctx.fillStyle = dark
+      ? `rgba(90, 70, 35, ${0.04 + rand() * 0.1})`
+      : `rgba(255, 250, 230, ${0.05 + rand() * 0.1})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  // card top edge highlight
+  ctx.fillStyle = "rgba(255, 250, 235, 0.5)";
+  ctx.fillRect(cardX, cardY, cardW, 2);
+  // card left-edge tuck shadow (wraps under the spine)
+  ctx.fillStyle = "rgba(70, 50, 20, 0.32)";
+  ctx.fillRect(cardX, cardY, 8, cardH);
+
+  // card header — "TRACK LISTING"
+  ctx.fillStyle = "rgba(30, 18, 6, 0.92)";
+  ctx.font = `700 16px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  letterSpacingSetter.letterSpacing = "4px";
+  ctx.fillText("TRACK LISTING", cardX + 32, cardY + 26);
+  letterSpacingSetter.letterSpacing = "0px";
+  // header rule
+  ctx.fillStyle = "rgba(60, 40, 16, 0.55)";
+  ctx.fillRect(cardX + 32, cardY + 52, cardW - 64, 1);
+
+  // three-track listing — the current track highlighted in projects
+  // palette navy, the other two in muted ink. the labels are generic
+  // ("RELEASE", "ENCORE", etc.) so this back panel reads as a coherent
+  // tape-style B-side without needing to know the other slabs.
+  const trackRows: Array<{ n: string; t: string; label: string }> = [
+    { n: "01", t: "5:42", label: "OVERTURE" },
+    { n: "02", t: "4:08", label: "RELEASE" },
+    { n: "03", t: "6:21", label: "ENCORE" },
+  ];
+  const rowStartY = cardY + 80;
+  const rowH = 36;
+  for (let i = 0; i < trackRows.length; i++) {
+    const r = trackRows[i]!;
+    const isMine = r.n === trackNumber;
+    const ry = rowStartY + i * rowH;
+    if (isMine) {
+      ctx.fillStyle = "rgba(155, 182, 255, 0.28)";
+      ctx.fillRect(cardX + 26, ry - 4, cardW - 52, rowH - 8);
+    }
+    ctx.fillStyle = isMine ? "#1d2740" : "rgba(50, 36, 14, 0.85)";
+    ctx.font = isMine
+      ? `800 22px "Impact", "Arial Narrow Bold", sans-serif`
+      : `600 18px "Arial Narrow", "Helvetica", sans-serif`;
+    letterSpacingSetter.letterSpacing = "2px";
+    ctx.fillText(r.n, cardX + 32, ry);
+    ctx.fillText(
+      isMine ? heading.toUpperCase() : r.label,
+      cardX + 84,
+      ry,
+    );
+    letterSpacingSetter.letterSpacing = "0px";
+    ctx.textAlign = "right";
+    ctx.font = `500 14px "Arial Narrow", "Helvetica", sans-serif`;
+    ctx.fillStyle = isMine
+      ? "rgba(29, 39, 64, 0.85)"
+      : "rgba(60, 46, 20, 0.7)";
+    ctx.fillText(r.t, cardX + cardW - 32, ry + 4);
+    ctx.textAlign = "left";
+  }
+
+  // bottom rule + meta line on the card
+  const metaY = cardY + cardH - 70;
+  ctx.fillStyle = "rgba(60, 40, 16, 0.4)";
+  ctx.fillRect(cardX + 32, metaY, cardW - 64, 1);
+  ctx.fillStyle = "rgba(40, 26, 10, 0.78)";
+  ctx.font = `600 12px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "left";
+  letterSpacingSetter.letterSpacing = "3px";
+  ctx.fillText(meta.toUpperCase(), cardX + 32, metaY + 14);
+  // composer / credit blurb (generic)
+  ctx.font = `400 11px "Arial", "Helvetica", sans-serif`;
+  ctx.fillStyle = "rgba(40, 26, 10, 0.55)";
+  letterSpacingSetter.letterSpacing = "1px";
   ctx.fillText(
-    meta.toUpperCase(),
-    stickerX + stickerW - 20,
-    stickerY + stickerH - 22,
+    "ALL TRACKS WRITTEN & PRODUCED BY O. SAUCEDA",
+    cardX + 32,
+    metaY + 36,
   );
   letterSpacingSetter.letterSpacing = "0px";
+
+  // ── catalog / serial block top-right of the back ──
+  ctx.fillStyle = "rgba(20, 26, 40, 0.85)";
+  ctx.font = `700 14px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  letterSpacingSetter.letterSpacing = "2px";
+  const catChars = "OSZLPRJ";
+  const catalogue = `OS-${catChars[Math.floor(rand() * catChars.length)] ?? "P"}${catChars[Math.floor(rand() * catChars.length)] ?? "R"}${Math.floor(rand() * 900 + 100)}`;
+  ctx.fillText(catalogue, W - 60, 60);
+  letterSpacingSetter.letterSpacing = "0px";
+  ctx.font = `500 11px "Arial Narrow", sans-serif`;
+  ctx.fillStyle = "rgba(20, 26, 40, 0.6)";
+  letterSpacingSetter.letterSpacing = "1px";
+  const stamp = `· ${20 + Math.floor(rand() * 10)} · MIX·MASTER`;
+  ctx.fillText(stamp, W - 60, 84);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // ── small lavender index tab top-right echoing the front sticker ──
+  const tabX = W - 220;
+  const tabY = 24;
+  const tabW = 170;
+  const tabH = 24;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+  ctx.fillRect(tabX + 3, tabY + 4, tabW, tabH);
+  ctx.fillStyle = "#b896d4";
+  ctx.fillRect(tabX, tabY, tabW, tabH);
+  ctx.fillStyle = "rgba(255, 250, 255, 0.45)";
+  ctx.fillRect(tabX, tabY, tabW, 1);
+  ctx.fillStyle = "#1a0830";
+  ctx.font = `700 12px "Arial Narrow", "Helvetica", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  letterSpacingSetter.letterSpacing = "3px";
+  ctx.fillText(`TRACK ${trackNumber} · B-SIDE`, tabX + tabW / 2, tabY + tabH / 2);
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // ── barcode block bottom-left ──
+  const barX = spineX + spineW + 48;
+  const barY = H - 130;
+  const barW = 220;
+  const barH = 64;
+  ctx.fillStyle = "#f0eee6";
+  ctx.fillRect(barX, barY, barW, barH);
+  // vertical bars of varying widths
+  let bx = barX + 8;
+  while (bx < barX + barW - 8) {
+    const w = 1 + Math.floor(rand() * 4);
+    const dark = rand() > 0.35;
+    if (dark) {
+      ctx.fillStyle = "#0a0c14";
+      ctx.fillRect(bx, barY + 8, w, barH - 28);
+    }
+    bx += w + 1 + Math.floor(rand() * 2);
+  }
+  // numerals under the barcode
+  ctx.fillStyle = "#0a0c14";
+  ctx.font = `600 12px "Courier New", monospace`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  letterSpacingSetter.letterSpacing = "2px";
+  ctx.fillText(
+    `${Math.floor(rand() * 9 + 1)} ${Math.floor(rand() * 90000 + 10000)} ${Math.floor(rand() * 90000 + 10000)} ${Math.floor(rand() * 9)}`,
+    barX + 10,
+    barY + barH - 18,
+  );
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // ── © stamp + printed-in tail under the barcode ──
+  ctx.fillStyle = "rgba(20, 26, 40, 0.7)";
+  ctx.font = `500 11px "Arial Narrow", sans-serif`;
+  ctx.textAlign = "left";
+  letterSpacingSetter.letterSpacing = "2px";
+  ctx.fillText(
+    `© ${2018 + Math.floor(rand() * 7)} OS · PRINTED IN U.S.A.`,
+    barX,
+    barY + barH + 14,
+  );
+  letterSpacingSetter.letterSpacing = "0px";
+
+  // ── subtle scuffs / scratches across the case ──
+  for (let i = 0; i < 6; i++) {
+    const sx = 80 + rand() * (W - 200);
+    const sy = 120 + rand() * (H - 240);
+    const sw = 40 + rand() * 120;
+    const angle = (rand() - 0.5) * 0.5;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(angle);
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.04 + rand() * 0.06})`;
+    ctx.fillRect(-sw / 2, 0, sw, 1);
+    ctx.restore();
+  }
+
+  // top-edge glossy highlight strip across the whole case
+  ctx.fillStyle = "rgba(255, 255, 255, 0.32)";
+  ctx.fillRect(0, 0, W, 2);
 
   // reset text defaults
   ctx.textAlign = "start";
