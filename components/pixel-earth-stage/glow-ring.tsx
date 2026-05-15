@@ -5,6 +5,8 @@ import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
+import { RIM_GLOW_BREATH, RIM_GLOW_OPACITY, rimGlowBeat } from "./rim-glow";
+
 type Props = {
   reducedMotion: boolean;
   isGlobeEnvironment: boolean;
@@ -39,12 +41,17 @@ export function GlowRing({ reducedMotion, isGlobeEnvironment }: Props) {
     groupRef.current.visible = isGlobeEnvironment;
     if (!isGlobeEnvironment || reducedMotion) return;
     // very subtle steady breathing — stage light, not a heartbeat
-    const t = clock.getElapsedTime();
-    const beat = 0.5 + 0.5 * Math.sin(t * 0.7);
-    if (haloRef.current) haloRef.current.opacity = 0.6 + 0.04 * beat;
-    if (bloomRef.current) bloomRef.current.opacity = 0.24 + 0.03 * beat;
-    if (hotRef.current) hotRef.current.opacity = 0.82 + 0.04 * beat;
-    if (flatRef.current) flatRef.current.opacity = 0.7 + 0.04 * beat;
+    const beat = rimGlowBeat(clock.getElapsedTime());
+    if (haloRef.current)
+      haloRef.current.opacity = RIM_GLOW_OPACITY.halo - 0.02 + RIM_GLOW_BREATH.halo * beat;
+    if (bloomRef.current)
+      bloomRef.current.opacity =
+        RIM_GLOW_OPACITY.bloom - 0.02 + RIM_GLOW_BREATH.bloom * beat;
+    if (hotRef.current)
+      hotRef.current.opacity = RIM_GLOW_OPACITY.hot + RIM_GLOW_BREATH.hot * beat;
+    if (flatRef.current)
+      flatRef.current.opacity =
+        RIM_GLOW_OPACITY.flat - 0.02 + RIM_GLOW_BREATH.flat * beat;
   });
 
   return (
