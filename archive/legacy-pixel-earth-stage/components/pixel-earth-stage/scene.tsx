@@ -19,7 +19,7 @@ import { DomeRimGlow } from "./dome-rim-glow";
 import { DomeSmoke } from "./dome-smoke";
 import { GlowRing } from "./glow-ring";
 import type { JCardScreenRect } from "./jcard-page";
-import { MonolithMountainStage } from "./monolith-mountain-stage";
+import { PyramidGroundedStage } from "./pyramid-grounded-stage";
 import { ResearchBridgeStage } from "./research-bridge-stage";
 import { ScreenAssembly } from "./screen-assembly";
 import { SectionRevealHost } from "./section-reveals/section-reveal-host";
@@ -168,19 +168,20 @@ export function Scene(props: Props) {
           onAboutSelectionChange={props.onAboutSelectionChange}
           onAboutPageCloseRequest={props.onAboutPageCloseRequest}
         />
-        <MonolithMountainStage
+        <PyramidGroundedStage
           targetRotationRef={props.targetRotationRef}
           isDraggingRef={props.isDraggingRef}
           lastInteractionRef={props.lastInteractionRef}
           reducedMotion={props.reducedMotion}
           isPyramidEnvironment={isPyramidEnvironment}
+          entered={props.enteredSectionId === "projects"}
         />
         <ResearchBridgeStage
           targetRotationRef={props.targetRotationRef}
           isDraggingRef={props.isDraggingRef}
           lastInteractionRef={props.lastInteractionRef}
           reducedMotion={props.reducedMotion}
-          isResearchEnvironment={isResearchEnvironment}
+          isVisible={isResearchEnvironment}
         />
         <ContactHouseStage
           targetRotationRef={props.targetRotationRef}

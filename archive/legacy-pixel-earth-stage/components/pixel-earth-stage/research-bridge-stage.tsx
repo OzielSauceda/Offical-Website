@@ -1,12 +1,14 @@
 "use client";
 
-// suspended glass-box bridge for the Research environment. long rectangular
-// platform with a dark slab floor, transparent paneled walls, vertical black
-// posts, warm orange/gold rim lights along the top and bottom edges, thin
-// cables extending up out of frame, and a painterly cloud backdrop behind it.
-// two small silhouette figures stand inside.
+// Glass-box bridge stage. Used by Research suspended from cables, and by
+// Projects resting grounded on the platform. Long rectangular platform
+// with a dark slab floor, transparent paneled walls, vertical black posts,
+// warm orange/gold rim lights along the top and bottom edges, X-braced end
+// panels, and two small silhouette figures standing inside. The mode prop
+// switches between the two placements: suspended hangs in the air with
+// cables; grounded drops to the platform plane and hides the cables.
 
- 
+
 
 import { RefObject, useEffect, useMemo, useRef } from "react";
 
@@ -21,8 +23,18 @@ const RESUME_DELAY_MS = 1400;
 // bridge dimensions, centered on origin
 const BRIDGE_LEN = 3.6;
 const BRIDGE_HEIGHT = 0.72;
-const BRIDGE_DEPTH = 0.78;
-const BRIDGE_Y = 1.4;
+const BRIDGE_DEPTH_SUSPENDED = 0.78;
+// Grounded mode is wider in depth so the Projects CD ring fits inside
+// the stage walls without poking through the front or back glass.
+const BRIDGE_DEPTH_GROUNDED = 1.85;
+
+// suspended Y — original Research placement, floats in the air above the
+// platform with the dome.
+const BRIDGE_Y_SUSPENDED = 1.4;
+// grounded Y — drops so the floor slab's underside sits at bridge-local
+// y=0. The parent group lifts it the tiny remaining amount to land on the
+// platform's rim plane.
+const BRIDGE_Y_GROUNDED = BRIDGE_HEIGHT / 2 + 0.12;
 
 // floor slab (dark underside)
 const FLOOR_THICKNESS = 0.12;
@@ -37,12 +49,19 @@ const RIM_COLOR = "#ffb050";
 const RIM_EMISSIVE = "#ff7a20";
 const GLASS_TINT = "#ff8a9c";
 
+export type ResearchBridgeMode = "suspended" | "grounded";
+
 type Props = {
   targetRotationRef: RefObject<number>;
   isDraggingRef: RefObject<boolean>;
   lastInteractionRef: RefObject<number>;
   reducedMotion: boolean;
-  isResearchEnvironment: boolean;
+  isVisible: boolean;
+  mode?: ResearchBridgeMode;
+  // When true, the stage dims its glass walls + hides the ceiling slats
+  // so the project content inside reads cleanly. Only honored in grounded
+  // mode; the suspended Research stage ignores it.
+  entered?: boolean;
 };
 
 export function ResearchBridgeStage({
@@ -50,7 +69,9 @@ export function ResearchBridgeStage({
   isDraggingRef,
   lastInteractionRef,
   reducedMotion,
-  isResearchEnvironment,
+  isVisible,
+  mode = "suspended",
+  entered = false,
 }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const silhouetteA = useMemo(() => createSilhouetteTexture("a"), []);
@@ -69,24 +90,28 @@ export function ResearchBridgeStage({
     const g = groupRef.current;
     if (!g) return;
 
-    g.visible = isResearchEnvironment;
-    if (!isResearchEnvironment) return;
+    g.visible = isVisible;
+    if (!isVisible) return;
 
-    const sinceInteraction = performance.now() - lastInteractionRef.current;
-    const canAutoRotate =
-      !reducedMotion &&
-      !isDraggingRef.current &&
-      sinceInteraction > RESUME_DELAY_MS;
-    if (canAutoRotate) {
-      targetRotationRef.current += AUTO_SPEED * delta * 0.35;
+    // Suspended owns its rotation tracking. Grounded leaves rotation to the
+    // parent (so the rim beam and the bridge spin together in one group).
+    if (mode === "suspended") {
+      const sinceInteraction = performance.now() - lastInteractionRef.current;
+      const canAutoRotate =
+        !reducedMotion &&
+        !isDraggingRef.current &&
+        sinceInteraction > RESUME_DELAY_MS;
+      if (canAutoRotate) {
+        targetRotationRef.current += AUTO_SPEED * delta * 0.35;
+      }
+
+      const target = targetRotationRef.current;
+      const current = g.rotation.y;
+      const k = reducedMotion ? 1 : Math.min(1, delta * 14);
+      g.rotation.y = current + (target - current) * k;
     }
 
-    const target = targetRotationRef.current;
-    const current = g.rotation.y;
-    const k = reducedMotion ? 1 : Math.min(1, delta * 14);
-    g.rotation.y = current + (target - current) * k;
-
-    // subtle idle bob on the figures
+    // subtle idle bob on the figures — only meaningful when figures render
     const t = performance.now() / 1000;
     const bob = reducedMotion ? 0 : Math.sin(t * 2.4) * 0.012;
     const bob2 = reducedMotion ? 0 : Math.sin(t * 2.4 + 1.6) * 0.012;
@@ -94,9 +119,26 @@ export function ResearchBridgeStage({
     if (figBref.current) figBref.current.position.y = FIG_Y + bob2;
   });
 
+  const bridgeY = mode === "grounded" ? BRIDGE_Y_GROUNDED : BRIDGE_Y_SUSPENDED;
+  const showCables = mode === "suspended";
+  const showFigures = mode === "suspended";
+  // Dim the glass walls + drop the ceiling slats only when we're actually
+  // showing project content inside the grounded stage. Suspended mode
+  // keeps its full look so Research is unaffected.
+  const dimmed = mode === "grounded" && entered;
+  const bridgeDepth =
+    mode === "grounded" ? BRIDGE_DEPTH_GROUNDED : BRIDGE_DEPTH_SUSPENDED;
+  // Glass opacities — wall panels and end panels fade down when entered so
+  // the project content inside isn't competing with stacked transparent
+  // surfaces. Numbers below are full / dimmed pairs.
+  const frontGlassOpacity = dimmed ? 0.05 : 0.18;
+  const backGlassOpacity = dimmed ? 0.04 : 0.14;
+  const endGlassOpacity = dimmed ? 0.06 : 0.2;
+  const slatVisible = !dimmed;
+
   const halfLen = BRIDGE_LEN / 2;
   const halfH = BRIDGE_HEIGHT / 2;
-  const halfD = BRIDGE_DEPTH / 2;
+  const halfD = bridgeDepth / 2;
 
   // panel divisions along the length
   const panelCount = POST_COUNT + 1;
@@ -119,37 +161,38 @@ export function ResearchBridgeStage({
   ];
 
   return (
-    <group ref={groupRef} position={[0, BRIDGE_Y, 0]}>
-      {/* SUSPENSION CABLES — thin lines extending up off-screen */}
-      {cableAnchors.map((p, i) => (
-        <mesh
-          key={`cable-${i}`}
-          position={[p[0], halfH + 1.6, p[1]]}
-        >
-          <cylinderGeometry args={[0.008, 0.008, 3.2, 6]} />
-          <meshBasicMaterial color="#15110c" toneMapped={false} />
-        </mesh>
-      ))}
+    <group ref={groupRef} position={[0, bridgeY, 0]}>
+      {/* SUSPENSION CABLES — thin lines extending up off-screen.
+          Hidden in grounded mode where the bridge rests on the platform. */}
+      {showCables &&
+        cableAnchors.map((p, i) => (
+          <mesh key={`cable-${i}`} position={[p[0], halfH + 1.6, p[1]]}>
+            <cylinderGeometry args={[0.008, 0.008, 3.2, 6]} />
+            <meshBasicMaterial color="#15110c" toneMapped={false} />
+          </mesh>
+        ))}
 
       {/* DARK FLOOR SLAB — underside of the bridge */}
       <mesh position={[0, -halfH - FLOOR_THICKNESS / 2, 0]}>
-        <boxGeometry args={[BRIDGE_LEN + 0.04, FLOOR_THICKNESS, BRIDGE_DEPTH + 0.04]} />
+        <boxGeometry args={[BRIDGE_LEN + 0.04, FLOOR_THICKNESS, bridgeDepth + 0.04]} />
         <meshStandardMaterial color="#0a0a10" roughness={0.92} metalness={0.1} />
       </mesh>
 
       {/* INSIDE FLOOR — slightly lighter, walking surface */}
       <mesh position={[0, -halfH + 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[BRIDGE_LEN - 0.04, BRIDGE_DEPTH - 0.04]} />
+        <planeGeometry args={[BRIDGE_LEN - 0.04, bridgeDepth - 0.04]} />
         <meshStandardMaterial color="#1a1014" roughness={0.85} metalness={0.05} />
       </mesh>
 
-      {/* GLASS PANELS — front and back walls, transparent with subtle tint */}
+      {/* GLASS PANELS — front and back walls, transparent with subtle tint.
+          Opacities drop when entered so the project content inside the
+          stage isn't stacked behind another transparent surface. */}
       <mesh position={[0, 0, halfD]}>
         <planeGeometry args={[BRIDGE_LEN, BRIDGE_HEIGHT]} />
         <meshStandardMaterial
           color={GLASS_TINT}
           transparent
-          opacity={0.18}
+          opacity={frontGlassOpacity}
           roughness={0.1}
           metalness={0.0}
           side={THREE.DoubleSide}
@@ -161,7 +204,7 @@ export function ResearchBridgeStage({
         <meshStandardMaterial
           color="#9aa9ff"
           transparent
-          opacity={0.14}
+          opacity={backGlassOpacity}
           roughness={0.1}
           metalness={0.0}
           side={THREE.DoubleSide}
@@ -172,11 +215,11 @@ export function ResearchBridgeStage({
       {/* END PANELS — glass with diagonal X-brace lines */}
       <group position={[halfLen, 0, 0]}>
         <mesh rotation={[0, Math.PI / 2, 0]}>
-          <planeGeometry args={[BRIDGE_DEPTH, BRIDGE_HEIGHT]} />
+          <planeGeometry args={[bridgeDepth, BRIDGE_HEIGHT]} />
           <meshStandardMaterial
             color={GLASS_TINT}
             transparent
-            opacity={0.2}
+            opacity={endGlassOpacity}
             roughness={0.1}
             side={THREE.DoubleSide}
             depthWrite={false}
@@ -194,11 +237,11 @@ export function ResearchBridgeStage({
       </group>
       <group position={[-halfLen, 0, 0]}>
         <mesh rotation={[0, Math.PI / 2, 0]}>
-          <planeGeometry args={[BRIDGE_DEPTH, BRIDGE_HEIGHT]} />
+          <planeGeometry args={[bridgeDepth, BRIDGE_HEIGHT]} />
           <meshStandardMaterial
             color={GLASS_TINT}
             transparent
-            opacity={0.2}
+            opacity={endGlassOpacity}
             roughness={0.1}
             side={THREE.DoubleSide}
             depthWrite={false}
@@ -214,16 +257,19 @@ export function ResearchBridgeStage({
         />
       </group>
 
-      {/* CEILING TRUSS — thin dark roof slats running across */}
-      {Array.from({ length: 14 }, (_, i) => {
-        const x = -halfLen + (i + 0.5) * (BRIDGE_LEN / 14);
-        return (
-          <mesh key={`slat-${i}`} position={[x, halfH - 0.01, 0]}>
-            <boxGeometry args={[0.04, 0.02, BRIDGE_DEPTH - 0.06]} />
-            <meshStandardMaterial color={FRAME_COLOR} roughness={0.9} />
-          </mesh>
-        );
-      })}
+      {/* CEILING TRUSS — thin dark roof slats running across. Hidden in
+          grounded entered mode so the project display inside has a clear
+          look-down view through the open top. */}
+      {slatVisible &&
+        Array.from({ length: 14 }, (_, i) => {
+          const x = -halfLen + (i + 0.5) * (BRIDGE_LEN / 14);
+          return (
+            <mesh key={`slat-${i}`} position={[x, halfH - 0.01, 0]}>
+              <boxGeometry args={[0.04, 0.02, bridgeDepth - 0.06]} />
+              <meshStandardMaterial color={FRAME_COLOR} roughness={0.9} />
+            </mesh>
+          );
+        })}
 
       {/* VERTICAL POSTS — corner posts and interior dividers */}
       {[-halfLen, halfLen].flatMap((x) =>
@@ -272,30 +318,34 @@ export function ResearchBridgeStage({
       {/* end-cap rims (short Z-axis bars) */}
       <RimEdge
         position={[halfLen, halfH + RIM_THICKNESS / 2, 0]}
-        length={BRIDGE_DEPTH + 0.04}
+        length={bridgeDepth + 0.04}
         thickness={RIM_THICKNESS}
         axis="z"
       />
       <RimEdge
         position={[halfLen, -halfH - RIM_THICKNESS / 2, 0]}
-        length={BRIDGE_DEPTH + 0.04}
+        length={bridgeDepth + 0.04}
         thickness={RIM_THICKNESS}
         axis="z"
       />
       <RimEdge
         position={[-halfLen, halfH + RIM_THICKNESS / 2, 0]}
-        length={BRIDGE_DEPTH + 0.04}
+        length={bridgeDepth + 0.04}
         thickness={RIM_THICKNESS}
         axis="z"
       />
       <RimEdge
         position={[-halfLen, -halfH - RIM_THICKNESS / 2, 0]}
-        length={BRIDGE_DEPTH + 0.04}
+        length={bridgeDepth + 0.04}
         thickness={RIM_THICKNESS}
         axis="z"
       />
 
-      {/* FIGURES — two silhouette sprites, one left, one right */}
+      {/* FIGURES — two silhouette sprites, one left, one right. Suspended
+          mode only; grounded (Projects) stays empty so the deck reads as a
+          display platform rather than an interior scene. */}
+      {showFigures && (
+        <>
       <sprite
         ref={figAref}
         position={[-halfLen * 0.4, FIG_Y, 0]}
@@ -322,6 +372,8 @@ export function ResearchBridgeStage({
           toneMapped={false}
         />
       </sprite>
+        </>
+      )}
     </group>
   );
 }

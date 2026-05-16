@@ -15,11 +15,14 @@ export const SECTION_CAMERA_TARGETS: Record<SectionId, CameraTarget> = {
     lookAt: [0, 1.78, 0],
   },
   projects: {
-    // CD cases are ~0.82 wide vs. the cassettes' ~1.3, so the same
-    // camera distance reads as further away. closer z compensates and
-    // matches the cassettes' apparent zoom on entry.
-    position: [0, 1.93, 3.05],
-    lookAt: [0, 1.8, 0],
+    // Pulled-back showcase pose for the grounded stage. Higher Y + further
+    // Z + lower lookAt put the camera in a three-quarter-from-above pose
+    // so the carousel sits at the top of frame instead of dominating it,
+    // and the CDs land inside the stage with clean negative space around
+    // them. lookAt sits between the dock and the CD center so both read
+    // as the visual anchor.
+    position: [0, 2.2, 4.05],
+    lookAt: [0, 0.7, 0],
   },
   research: {
     position: [0, 1.72, 4.85],

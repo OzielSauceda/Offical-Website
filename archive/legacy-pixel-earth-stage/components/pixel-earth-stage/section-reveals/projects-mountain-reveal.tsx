@@ -16,21 +16,33 @@ import {
   createCdStickerTexture,
 } from "../textures";
 
-const RING_RADIUS = 1.7;
+// CD ring sized to sit inside the grounded Projects stage. Smaller radius
+// + ring center pulled back from origin so the three CDs land between the
+// front and back glass walls of the bridge instead of floating out past it.
+const RING_RADIUS = 0.95;
+const RING_CENTER_Z = -0.45;
 // square CD-case proportions (1:1). slightly smaller than the cassette
 // so three of them in a row sit comfortably around the character.
 const CASE_W = 0.82;
 const CASE_H = 0.82;
 const CASE_D = 0.07;
-const CASE_REST_Y = 1.85;
-const CASE_HIDDEN_Y = -0.6;
-const RING_CENTER_Z = -0.05;
-// clip against the platform surface so the case reads as passing
-// through a stage slot on entry / exit, never visible below ground.
-const CD_STAGE_CLIP_Y = -0.04;
-const CD_CLIPPING_PLANES = [
-  new THREE.Plane(new THREE.Vector3(0, 1, 0), -CD_STAGE_CLIP_Y),
-];
+// Resting Y for a docked CD. Tuned so the dock bottom lands flush on the
+// bridge's interior walking floor (≈ world Y 0.18 after the grounded
+// stage's MODEL_SCALE / MODEL_Y wrapper). CASE_HIDDEN_Y sits above the
+// carousel-clear zone so the entry animation descends rather than rising:
+// the CDs fall into their docks from overhead.
+const CASE_REST_Y = 0.7;
+const CASE_HIDDEN_Y = 2.55;
+// Landing dock — a low glass display pedestal under each CD. Top sits at
+// CD bottom so the disc lands flush; bottom rests on the bridge interior
+// floor so it reads as physically anchored.
+const DOCK_RADIUS = 0.38;
+const DOCK_HEIGHT = 0.11;
+const DOCK_TOP_Y = CASE_REST_Y - CASE_H / 2;
+const DOCK_CENTER_Y = DOCK_TOP_Y - DOCK_HEIGHT / 2;
+// CDs never travel below Y=0 now (rest at 0.95, hidden at 2.55), so the
+// old stage-slot clipping plane is a no-op kept for the mesh wiring.
+const CD_CLIPPING_PLANES: THREE.Plane[] = [];
 // linear exit ramp so raw actually reaches 0 within the unmount window,
 // letting the visibility guard kick in once the descent finishes.
 const EXIT_DURATION = 1.5;
@@ -391,6 +403,90 @@ function ProjectsCdCase({
   );
 }
 
+// Glass display pedestal — the visible "landing dock" under each CD.
+// Fades in ahead of the CD descent so the user sees the landing spot
+// before the disc arrives. Always sits at the matching CD ring position
+// so it rotates with the CDs and stays under whichever case is on top.
+function CdLandingDock({
+  angle,
+  entryProgressRef,
+}: {
+  angle: number;
+  entryProgressRef: RefObject<number>;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const glassMatRef = useRef<THREE.MeshStandardMaterial>(null);
+  const rimMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const haloMatRef = useRef<THREE.MeshBasicMaterial>(null);
+
+  useFrame(() => {
+    const g = groupRef.current;
+    if (!g) return;
+    const raw = entryProgressRef.current;
+    // ramp the dock in over the first 28% of the entry so it lands
+    // before any CD descends past its level
+    const fade = Math.max(0, Math.min(1, raw / 0.28));
+    g.visible = fade > 0.005;
+    if (glassMatRef.current) glassMatRef.current.opacity = 0.38 * fade;
+    if (rimMatRef.current) rimMatRef.current.opacity = 0.92 * fade;
+    if (haloMatRef.current) haloMatRef.current.opacity = 0.55 * fade;
+  });
+
+  const x = Math.sin(angle) * RING_RADIUS;
+  const z = Math.cos(angle) * RING_RADIUS + RING_CENTER_Z;
+
+  return (
+    <group ref={groupRef} position={[x, DOCK_CENTER_Y, z]}>
+      {/* glass cylinder body — frosted blue-tinted display pedestal */}
+      <mesh>
+        <cylinderGeometry args={[DOCK_RADIUS, DOCK_RADIUS, DOCK_HEIGHT, 56]} />
+        <meshStandardMaterial
+          ref={glassMatRef}
+          color="#cfe1f4"
+          emissive="#4a7fb8"
+          emissiveIntensity={0.5}
+          roughness={0.12}
+          metalness={0.06}
+          transparent
+          opacity={0.38}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      {/* warm rim ring around the top — gives the dock a defined catch
+          light and a small contact ring under the CD */}
+      <mesh position={[0, DOCK_HEIGHT / 2 + 0.001, 0]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[DOCK_RADIUS - 0.025, DOCK_RADIUS + 0.005, 64]} />
+        <meshBasicMaterial
+          ref={rimMatRef}
+          color="#ffce8a"
+          transparent
+          opacity={0.92}
+          toneMapped={false}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* soft floor halo just beneath the pedestal — sells contact with
+          the stage floor without needing a real shadow pass */}
+      <mesh position={[0, -DOCK_HEIGHT / 2 - 0.001, 0]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[DOCK_RADIUS * 0.55, DOCK_RADIUS * 1.35, 64]} />
+        <meshBasicMaterial
+          ref={haloMatRef}
+          color="#8ec0f4"
+          transparent
+          opacity={0.55}
+          toneMapped={false}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 function ProjectsCdRing({
   entered,
   reducedMotion,
@@ -417,6 +513,13 @@ function ProjectsCdRing({
 
   return (
     <group ref={ringRef}>
+      {slabs.map((_, i) => (
+        <CdLandingDock
+          key={`dock-${i}`}
+          angle={CASE_ANGLES[i] ?? 0}
+          entryProgressRef={entryProgressRef}
+        />
+      ))}
       {slabs.map((slab, i) => (
         <ProjectsCdCase
           key={i}
