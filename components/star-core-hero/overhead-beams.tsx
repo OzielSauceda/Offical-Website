@@ -70,16 +70,16 @@ function makeUniforms(color: string, intensity: number, fresPower: number) {
 export function OverheadBeams({ reducedMotion }: { reducedMotion: boolean }) {
   const coreRef = useRef<THREE.ShaderMaterial>(null);
 
-  const midUniforms = useMemo(() => makeUniforms("#cdeaff", 0.05, 2.3), []);
-  const innerUniforms = useMemo(() => makeUniforms("#dfeeff", 0.14, 2.7), []);
-  const coreUniforms = useMemo(() => makeUniforms("#eaf6ff", 0.32, 3.4), []);
+  const midUniforms = useMemo(() => makeUniforms("#cdeaff", 0.018, 2.3), []);
+  const innerUniforms = useMemo(() => makeUniforms("#dfeeff", 0.04, 2.7), []);
+  const coreUniforms = useMemo(() => makeUniforms("#eaf6ff", 0.08, 3.4), []);
 
   useFrame(() => {
     const t = performance.now() / 1000;
     const breathe = reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(t * 1.25);
     if (coreRef.current) {
       const u = coreRef.current.uniforms.uIntensity;
-      if (u) u.value = 0.32 + 0.05 * breathe;
+      if (u) u.value = 0.08 + 0.02 * breathe;
     }
   });
 

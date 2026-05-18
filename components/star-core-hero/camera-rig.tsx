@@ -6,8 +6,8 @@ import { useEffect, useRef } from "react";
 
 import { useFrame, useThree } from "@react-three/fiber";
 
-const DEFAULT_POS: [number, number, number] = [0, 1.72, 5.75];
-const DEFAULT_LOOK: [number, number, number] = [0, 1.52, 0];
+const DEFAULT_POS: [number, number, number] = [0, 1.7, 7.25];
+const DEFAULT_LOOK: [number, number, number] = [0, 1.42, 0];
 
 export function CameraRig({ reducedMotion }: { reducedMotion: boolean }) {
   const { camera } = useThree();

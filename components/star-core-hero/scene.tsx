@@ -1,8 +1,8 @@
 "use client";
 
-import { RefObject, Suspense } from "react";
+import { RefObject } from "react";
 
-import { Environment, Stars } from "@react-three/drei";
+import { Stars } from "@react-three/drei";
 
 import { CameraRig } from "./camera-rig";
 import { OverheadBeams } from "./overhead-beams";
@@ -14,14 +14,13 @@ import { StarCore } from "./star-core";
 
 type Props = {
   targetRotationRef: RefObject<number>;
-  isDraggingRef: RefObject<boolean>;
-  lastInteractionRef: RefObject<number>;
   reducedMotion: boolean;
 };
 
 export function Scene(props: Props) {
   return (
     <>
+      <color attach="background" args={["#020414"]} />
       <fog attach="fog" args={["#03040b", 4.4, 11]} />
       <ambientLight intensity={0.45} />
       <spotLight
@@ -49,18 +48,11 @@ export function Scene(props: Props) {
 
       <CameraRig reducedMotion={props.reducedMotion} />
 
-      {/* env map for chrome material reflections. wrapped in Suspense so
-          the HDRI load does not unmount the rest of the scene; if the
-          fetch fails or is slow the star still renders with direct lights. */}
-      <Suspense fallback={null}>
-        <Environment preset="city" environmentIntensity={0.42} />
-      </Suspense>
-
       <SpaceBackground reducedMotion={props.reducedMotion} />
 
       {!props.reducedMotion && (
         <>
-          <Stars radius={34} depth={26} count={650} factor={2} fade speed={0.65} />
+          <Stars radius={34} depth={26} count={320} factor={1.6} fade speed={0.55} />
           <ShootingStars />
         </>
       )}
@@ -71,8 +63,6 @@ export function Scene(props: Props) {
 
       <StarCore
         targetRotationRef={props.targetRotationRef}
-        isDraggingRef={props.isDraggingRef}
-        lastInteractionRef={props.lastInteractionRef}
         reducedMotion={props.reducedMotion}
       />
     </>

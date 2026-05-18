@@ -5,36 +5,34 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
-const TRACE_Z = 0.095;
-const NODE_Z = TRACE_Z + 0.003;
+// shell is now flat; traces sit just above the top shell layer so
+// they read as embedded under the bright surface.
+const TRACE_Z = 0.006;
+const NODE_Z = TRACE_Z + 0.001;
 
-// per-arm engraved detail in arm-local coords. shorter rails and
-// asymmetric small branches feel more like reference engraving and
-// less like a symmetric PCB.
+// per-arm engraved detail in arm-local coords. centerline rib +
+// parallel rails + small branch ticks. lines are drawn with
+// NormalBlending using a deep icy cyan so they tint the bright
+// body white in pale cyan and are readable on a desktop screenshot.
 type LocalSegment = readonly [
   readonly [number, number],
   readonly [number, number],
 ];
 
+// sparse contour-following detail — one short rib near the arm tip
+// plus one tiny branch. only two nodes per arm. avoids any long
+// center-radiating lines and keeps the central white area clean.
 const ARM_SEGMENTS: readonly LocalSegment[] = [
-  // short upper rail near the base
-  [[0.36, 0.045], [0.68, 0.045]],
-  // short lower rail, offset further out for asymmetry
-  [[0.5, -0.045], [0.82, -0.045]],
-  // tiny upper branch outward
-  [[0.68, 0.045], [0.78, 0.085]],
-  // tiny lower branch outward
-  [[0.82, -0.045], [0.92, -0.085]],
-  // small base tick
-  [[0.32, 0], [0.32, 0.04]],
+  // tip-side rib along the arm centerline, well past the center
+  [[0.9, 0], [1.42, 0]],
+  // one small branch offset outward
+  [[1.18, 0], [1.3, 0.072]],
 ];
 
-// nodes along the arm — sparse, sitting at branch tips and rail ends
+// nodes at the two rib endpoints
 const NODE_POINTS: readonly (readonly [number, number])[] = [
-  [0.36, 0.045],
-  [0.78, 0.085],
-  [0.92, -0.085],
-  [0.32, 0.04],
+  [0.9, 0],
+  [1.3, 0.072],
 ];
 
 function toWorld(
@@ -81,13 +79,13 @@ export function CircuitTraces({ reducedMotion }: { reducedMotion: boolean }) {
     const pulse = reducedMotion
       ? 0.5
       : 0.5 + 0.5 * Math.sin(clock.getElapsedTime() * 0.8);
-    if (lineMatRef.current) lineMatRef.current.opacity = 0.07 + pulse * 0.03;
-    if (pointMatRef.current) pointMatRef.current.opacity = 0.18 + pulse * 0.08;
+    if (lineMatRef.current) lineMatRef.current.opacity = 0.24 + pulse * 0.05;
+    if (pointMatRef.current) pointMatRef.current.opacity = 0.34 + pulse * 0.06;
   });
 
   return (
     <group>
-      <lineSegments renderOrder={10}>
+      <lineSegments renderOrder={20}>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
@@ -99,16 +97,17 @@ export function CircuitTraces({ reducedMotion }: { reducedMotion: boolean }) {
         </bufferGeometry>
         <lineBasicMaterial
           ref={lineMatRef}
-          color="#cfeeff"
+          color="#9cc8de"
           transparent
-          opacity={0.1}
-          blending={THREE.AdditiveBlending}
+          opacity={0.34}
+          blending={THREE.NormalBlending}
           depthWrite={false}
           toneMapped={false}
+          fog={false}
         />
       </lineSegments>
 
-      <points renderOrder={11}>
+      <points renderOrder={21}>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
@@ -120,14 +119,15 @@ export function CircuitTraces({ reducedMotion }: { reducedMotion: boolean }) {
         </bufferGeometry>
         <pointsMaterial
           ref={pointMatRef}
-          color="#ffffff"
-          size={0.014}
+          color="#bee0f0"
+          size={0.03}
           sizeAttenuation
           transparent
-          opacity={0.28}
-          blending={THREE.AdditiveBlending}
+          opacity={0.46}
+          blending={THREE.NormalBlending}
           depthWrite={false}
           toneMapped={false}
+          fog={false}
         />
       </points>
     </group>

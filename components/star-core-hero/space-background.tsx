@@ -7,9 +7,11 @@ import * as THREE from "three";
 
 import { getSoftPuff } from "@/lib/three-helpers/soft-puff";
 
-const SMALL_STAR_COUNT = 220;
-const BRIGHT_STAR_COUNT = 40;
-const DUST_COUNT = 64;
+const SMALL_STAR_COUNT = 160;
+const BRIGHT_STAR_COUNT = 28;
+const ACCENT_STAR_COUNT = 14;
+const WARM_SPARK_COUNT = 12;
+const DUST_COUNT = 56;
 
 type Vec3 = [number, number, number];
 
@@ -72,11 +74,23 @@ export function SpaceBackground({
   const puffTex = getSoftPuff();
 
   const smallStars = useMemo(
-    () => makeStarPositions(SMALL_STAR_COUNT, 0.62, 5.8, seededRng(0x5a1d)),
+    () => makeStarPositions(SMALL_STAR_COUNT, 0.22, 5.8, seededRng(0x5a1d)),
     [],
   );
   const brightStars = useMemo(
-    () => makeStarPositions(BRIGHT_STAR_COUNT, 0.78, 4.6, seededRng(0xb71a)),
+    () => makeStarPositions(BRIGHT_STAR_COUNT, 0.3, 4.6, seededRng(0xb71a)),
+    [],
+  );
+  // sparse accent stars — slightly larger and a touch bluer, sprinkled
+  // across the field for natural variation
+  const accentStars = useMemo(
+    () => makeStarPositions(ACCENT_STAR_COUNT, 0.18, 4.2, seededRng(0xc04a)),
+    [],
+  );
+  // sparse tiny warm sparks — gold/peach pinpoints scattered across the
+  // background to add subtle premium atmosphere. kept very small and few.
+  const warmSparks = useMemo(
+    () => makeStarPositions(WARM_SPARK_COUNT, 0.1, 6, seededRng(0x77a3)),
     [],
   );
 
@@ -100,6 +114,34 @@ export function SpaceBackground({
       arr[i * 3 + 2] = -7 - rng() * 8;
     }
     return arr;
+  }, []);
+
+  // edge vignette — triangle fan with RGBA vertex colors so the
+  // center is fully transparent and the corners are opaque dark
+  // navy. drawn last with depthTest off so it darkens the corners
+  // of the framebuffer regardless of what sits behind it.
+  const vignetteGeometry = useMemo(() => {
+    const segments = 80;
+    const radiusX = 26;
+    const radiusY = 18;
+    const positions: number[] = [0, 0, 0];
+    const colors: number[] = [0, 0, 0, 0];
+    for (let i = 0; i <= segments; i++) {
+      const t = (i / segments) * Math.PI * 2;
+      positions.push(Math.cos(t) * radiusX, Math.sin(t) * radiusY, 0);
+      colors.push(0.0, 0.0, 0.02, 1.0);
+    }
+    const indices: number[] = [];
+    for (let i = 1; i <= segments; i++) indices.push(0, i, i + 1);
+    const geom = new THREE.BufferGeometry();
+    geom.setIndex(indices);
+    geom.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3),
+    );
+    // itemSize=4 enables per-vertex alpha in three.js
+    geom.setAttribute("color", new THREE.Float32BufferAttribute(colors, 4));
+    return geom;
   }, []);
   const dustPhases = useMemo(() => {
     const rng = seededRng(0xd158);
@@ -161,6 +203,69 @@ export function SpaceBackground({
 
   return (
     <group>
+      {/* nebula wisps — left and lower-right only, never behind the
+          star. fog={false} is critical: scene fog at far=11 would
+          otherwise fully erase anything this distant. opacities are
+          tuned for visible-but-subtle on a normal desktop screenshot. */}
+      <sprite position={[-15.5, 0.8, -18]} scale={[17, 24, 1]}>
+        <spriteMaterial
+          map={puffTex}
+          color="#3b577e"
+          transparent
+          opacity={0.48}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+          fog={false}
+          rotation={0.18}
+        />
+      </sprite>
+
+      <sprite position={[15.5, -4.2, -19]} scale={[19, 15, 1]}>
+        <spriteMaterial
+          map={puffTex}
+          color="#2f4a72"
+          transparent
+          opacity={0.42}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+          fog={false}
+          rotation={-0.5}
+        />
+      </sprite>
+
+      {/* a slim diagonal accent wisp drifting in from the right */}
+      <sprite position={[12, 6.5, -21]} scale={[13, 8.5, 1]}>
+        <spriteMaterial
+          map={puffTex}
+          color="#476890"
+          transparent
+          opacity={0.34}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+          fog={false}
+          rotation={-0.9}
+        />
+      </sprite>
+
+      {/* atmospheric haze behind the star — subtle, soft, narrower
+          than the star silhouette and well behind the star plane
+          so it reads as depth, never as a disc. */}
+      <sprite position={[0, 1.85, -1.4]} scale={[2.2, 1.9, 1]}>
+        <spriteMaterial
+          map={puffTex}
+          color="#3a5278"
+          transparent
+          opacity={0.1}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+          fog={false}
+        />
+      </sprite>
+
       <group ref={skyRef}>
         <points renderOrder={-2}>
           <bufferGeometry>
@@ -174,11 +279,55 @@ export function SpaceBackground({
           </bufferGeometry>
           <pointsMaterial
             ref={smallStarMatRef}
-            size={0.075}
-            color="#8eaccc"
+            size={0.062}
+            color="#d6e2f2"
             map={puffTex}
             transparent
-            opacity={0.8}
+            opacity={0.78}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            sizeAttenuation
+          />
+        </points>
+
+        <points renderOrder={-2}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              array={accentStars}
+              count={ACCENT_STAR_COUNT}
+              itemSize={3}
+              args={[accentStars, 3]}
+            />
+          </bufferGeometry>
+          <pointsMaterial
+            size={0.13}
+            color="#a8c8ec"
+            map={puffTex}
+            transparent
+            opacity={0.78}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+            sizeAttenuation
+          />
+        </points>
+
+        <points renderOrder={-2}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              array={warmSparks}
+              count={WARM_SPARK_COUNT}
+              itemSize={3}
+              args={[warmSparks, 3]}
+            />
+          </bufferGeometry>
+          <pointsMaterial
+            size={0.11}
+            color="#ffc890"
+            map={puffTex}
+            transparent
+            opacity={0.7}
             depthWrite={false}
             blending={THREE.AdditiveBlending}
             sizeAttenuation
@@ -198,8 +347,8 @@ export function SpaceBackground({
         </bufferGeometry>
         <pointsMaterial
           ref={brightStarMatRef}
-          size={0.22}
-          color="#eaf6ff"
+          size={0.18}
+          color="#eef6ff"
           map={puffTex}
           transparent
           opacity={0.85}
@@ -230,6 +379,25 @@ export function SpaceBackground({
           sizeAttenuation
         />
       </points>
+
+      {/* edge vignette — drawn last with depthTest off so it sits
+          on top of stars, nebula, and any background detail at the
+          corners while leaving the center untouched. */}
+      <mesh
+        position={[0, 1.5, -2]}
+        geometry={vignetteGeometry}
+        renderOrder={9999}
+      >
+        <meshBasicMaterial
+          vertexColors
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          toneMapped={false}
+          fog={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
     </group>
   );
 }

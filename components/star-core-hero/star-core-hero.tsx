@@ -25,7 +25,6 @@ export function StarCoreHero() {
   const [grabbing, setGrabbing] = useState(false);
   const targetRotationRef = useRef(0);
   const isDraggingRef = useRef(false);
-  const lastInteractionRef = useRef(0);
   const lastXRef = useRef(0);
   const reducedMotion = useReducedMotion();
 
@@ -37,7 +36,6 @@ export function StarCoreHero() {
     }
     isDraggingRef.current = true;
     lastXRef.current = e.clientX;
-    lastInteractionRef.current = performance.now();
     setGrabbing(true);
   }, []);
 
@@ -46,7 +44,6 @@ export function StarCoreHero() {
     const dx = e.clientX - lastXRef.current;
     lastXRef.current = e.clientX;
     targetRotationRef.current += dx * 0.012;
-    lastInteractionRef.current = performance.now();
   }, []);
 
   const onPointerUp = useCallback((e: PointerEvent<HTMLDivElement>) => {
@@ -56,20 +53,18 @@ export function StarCoreHero() {
       // already released
     }
     isDraggingRef.current = false;
-    lastInteractionRef.current = performance.now();
     setGrabbing(false);
   }, []);
 
   return (
     <section
       aria-label="Star core hero"
-      className="relative w-full h-[100svh] overflow-hidden bg-[color:var(--color-bg)]"
+      className="relative w-full min-h-screen overflow-hidden bg-[color:var(--color-bg)]"
+      style={{ height: "100svh" }}
     >
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 h-full min-h-screen">
         <StarCanvas
           targetRotationRef={targetRotationRef}
-          isDraggingRef={isDraggingRef}
-          lastInteractionRef={lastInteractionRef}
           reducedMotion={reducedMotion}
         />
       </div>
@@ -84,11 +79,11 @@ export function StarCoreHero() {
       />
 
       <div className="pointer-events-none absolute inset-0">
-        <p className="absolute left-6 top-6 sm:left-10 sm:top-10 text-xs sm:text-sm uppercase tracking-[0.32em] text-[color:var(--color-fg)]">
+        <p className="absolute left-6 top-6 sm:left-10 sm:top-10 text-xs sm:text-sm uppercase tracking-[0.32em] text-[#f4dc72]">
           Oziel Sauceda
         </p>
 
-        <p className="absolute right-6 bottom-6 sm:right-10 sm:bottom-10 text-[10px] sm:text-xs uppercase tracking-[0.25em] text-[color:var(--color-muted)]">
+        <p className="absolute right-6 bottom-6 sm:right-10 sm:bottom-10 text-[10px] sm:text-xs uppercase tracking-[0.25em] text-[#d7bd50]">
           drag to rotate · scroll to read on
         </p>
       </div>
